@@ -1,179 +1,72 @@
 (function () {
-  var STATIC_API_BASE = "https://axiomtradepro.org";
-  var runtime = window.__FORM_RUNTIME_CONFIG__ || {};
-  var formMeta = document.querySelector('meta[name="api-base"]');
-  var mainMeta = document.querySelector('meta[name="main-api-base"]');
-  var formMetaValue = (formMeta && formMeta.getAttribute("content")) || "";
-  var mainMetaValue = (mainMeta && mainMeta.getAttribute("content")) || "";
-  var origin =
-    (typeof window !== "undefined" && window.location && window.location.origin) || "";
-  var publicUrl = runtime.FORM_PUBLIC_URL || "";
+  // Edit only this value when backend API domain changes.
+  var API_BASE = "https://axiomtradepro.org";
+  var WHATSAPP_BASE_URL = "https://wa.me/41772895081?text=";
 
   function normalizeBase(base) {
     return (base || "").replace(/\/+$/, "");
   }
 
-  /** Live Server / VS Code — только статика; API на том же порту даст 405. */
-  function isLiveServerStaticOrigin() {
-    if (!origin) return false;
-    return (
-      /127\.0\.0\.1:5500/.test(origin) ||
-      /localhost:5500/.test(origin) ||
-      /127\.0\.0\.1:8080/.test(origin) ||
-      /localhost:8080/.test(origin)
-    );
-  }
-
-  var devApiBase = normalizeBase(runtime.DEV_API_BASE || "") || "http://localhost:3000";
-
-  /**
-   * База API: meta > Live Server → localhost:3000 > monetoplus same-origin > runtime > дефолт.
-   */
-  function resolveFormApiBase() {
-    var m = (formMetaValue || "").trim();
-    if (m) return normalizeBase(m);
-    if (isLiveServerStaticOrigin()) {
-      return devApiBase;
-    }
-    if (origin && origin.indexOf("monetoplusapp.com") >= 0) {
-      return normalizeBase(origin);
-    }
-    if (runtime.FORM_API_BASE) return normalizeBase(runtime.FORM_API_BASE);
-    return STATIC_API_BASE;
-  }
-
-  function resolveMainApiBase() {
-    var m = (mainMetaValue || "").trim();
-    if (m) return normalizeBase(m);
-    if (isLiveServerStaticOrigin()) {
-      return devApiBase;
-    }
-    if (origin && origin.indexOf("monetoplusapp.com") >= 0) {
-      return normalizeBase(origin);
-    }
-    if (runtime.MAIN_API_BASE) return normalizeBase(runtime.MAIN_API_BASE);
-    return STATIC_API_BASE;
-  }
-
-  var FORM = resolveFormApiBase();
-  var MAIN = resolveMainApiBase();
-  var PUBLIC = publicUrl || FORM || origin;
-  var WHATSAPP_BASE = runtime.WHATSAPP_BASE_URL || "";
-
-  window.FORM_PUBLIC_URL = PUBLIC;
-  window.FORM_API_BASE = FORM;
-  window.MAIN_API_BASE = MAIN;
-  window.API_BASE = FORM;
-  window.WHATSAPP_BASE_URL = WHATSAPP_BASE;
-
-  function pushUnique(list, base) {
-    var normalized = normalizeBase(base);
-    if (!normalized) return;
-    if (list.indexOf(normalized) === -1) list.push(normalized);
-  }
-
-  function buildUrl(base, path) {
-    var cleanBase = normalizeBase(base);
+  function buildUrl(path) {
     var cleanPath = path || "";
-    if (!cleanPath) return cleanBase;
-    return cleanBase + (cleanPath.charAt(0) === "/" ? cleanPath : "/" + cleanPath);
+    if (!cleanPath) return normalizeBase(API_BASE);
+    return normalizeBase(API_BASE) + (cleanPath.charAt(0) === "/" ? cleanPath : "/" + cleanPath);
   }
 
-  function parseJsonPayload(text, contentType) {
-    var raw = typeof text === "string" ? text : "";
-    var type = (contentType || "").toLowerCase();
-    if (!raw.trim()) return { ok: true, value: null };
-    if (type.indexOf("application/json") === -1 && !/^\s*[\[{]/.test(raw)) {
-      return { ok: false, value: null };
+  async function parseJsonResponse(response, url) {
+    var contentType = (response.headers && response.headers.get("content-type")) || "";
+    var text = await response.text();
+
+    if (!response.ok) {
+      var httpError = new Error("HTTP " + response.status + " for " + url);
+      httpError.status = response.status;
+      httpError.url = url;
+      httpError.text = text;
+      throw httpError;
     }
+
+    if (!text.trim()) {
+      return { url: url, response: response, data: null, text: text };
+    }
+
+    if (contentType.toLowerCase().indexOf("application/json") === -1 && !/^\s*[\[{]/.test(text)) {
+      var jsonError = new Error("Expected JSON from " + url);
+      jsonError.status = response.status;
+      jsonError.url = url;
+      jsonError.text = text;
+      throw jsonError;
+    }
+
     try {
-      return { ok: true, value: JSON.parse(raw) };
+      return { url: url, response: response, data: JSON.parse(text), text: text };
     } catch (_) {
-      return { ok: false, value: null };
+      var parseError = new Error("Invalid JSON from " + url);
+      parseError.status = response.status;
+      parseError.url = url;
+      parseError.text = text;
+      throw parseError;
     }
   }
 
-  function getApiBaseCandidates(preferredBase) {
-    var candidates = [];
-    pushUnique(candidates, preferredBase);
-    pushUnique(candidates, window.FORM_API_BASE || window.API_BASE);
-    pushUnique(candidates, window.MAIN_API_BASE);
-    if (isLiveServerStaticOrigin()) {
-      pushUnique(candidates, devApiBase);
-    }
-    pushUnique(candidates, STATIC_API_BASE);
-    return candidates;
-  }
+  window.FORM_PUBLIC_URL = window.location.origin || "";
+  window.FORM_API_BASE = normalizeBase(API_BASE);
+  window.MAIN_API_BASE = normalizeBase(API_BASE);
+  window.API_BASE = normalizeBase(API_BASE);
+  window.WHATSAPP_BASE_URL = WHATSAPP_BASE_URL;
 
-  async function fetchJsonWithApiFallback(path, init, preferredBase) {
-    var candidates = getApiBaseCandidates(preferredBase);
-    var lastError = null;
+  window.getApiBaseCandidates = function () {
+    return [window.API_BASE];
+  };
 
-    for (var i = 0; i < candidates.length; i++) {
-      var url = buildUrl(candidates[i], path);
-      try {
-        var response = await fetch(url, init || {});
-        var contentType = (response.headers && response.headers.get("content-type")) || "";
-        var text = await response.text();
-        var parsed = parseJsonPayload(text, contentType);
-        var looksLikeHtml = contentType.toLowerCase().indexOf("text/html") >= 0 || /^\s*</.test(text || "");
+  window.fetchJsonWithApiFallback = async function (path, init) {
+    var url = buildUrl(path);
+    var response = await fetch(url, init || {});
+    return parseJsonResponse(response, url);
+  };
 
-        // Успех только при HTTP 2xx и валидном JSON (иначе 405 с пустым телом давал parsed.ok)
-        if (response.ok && parsed.ok) {
-          return { url: url, response: response, data: parsed.value, text: text };
-        }
-
-        lastError = new Error("Non-JSON response from " + url + " (status " + response.status + ")");
-        lastError.status = response.status;
-        lastError.url = url;
-        lastError.text = text;
-
-        var shouldFallback =
-          response.status === 404 ||
-          response.status === 405 ||
-          looksLikeHtml ||
-          !parsed.ok;
-
-        if (!shouldFallback || i === candidates.length - 1) {
-          throw lastError;
-        }
-      } catch (err) {
-        lastError = err;
-        if (i === candidates.length - 1) throw err;
-      }
-    }
-
-    throw lastError || new Error("API request failed");
-  }
-
-  async function fetchWithApiFallback(path, init, preferredBase) {
-    var candidates = getApiBaseCandidates(preferredBase);
-    var lastError = null;
-
-    for (var i = 0; i < candidates.length; i++) {
-      var url = buildUrl(candidates[i], path);
-      try {
-        var response = await fetch(url, init || {});
-        var contentType = (response.headers && response.headers.get("content-type")) || "";
-        var shouldFallback =
-          !response.ok &&
-          (response.status === 404 ||
-            response.status === 405 ||
-            contentType.toLowerCase().indexOf("text/html") >= 0);
-
-        if (!shouldFallback || i === candidates.length - 1) {
-          return { url: url, response: response };
-        }
-      } catch (err) {
-        lastError = err;
-        if (i === candidates.length - 1) throw err;
-      }
-    }
-
-    throw lastError || new Error("API request failed");
-  }
-
-  window.getApiBaseCandidates = getApiBaseCandidates;
-  window.fetchJsonWithApiFallback = fetchJsonWithApiFallback;
-  window.fetchWithApiFallback = fetchWithApiFallback;
+  window.fetchWithApiFallback = async function (path, init) {
+    var url = buildUrl(path);
+    var response = await fetch(url, init || {});
+    return { url: url, response: response };
+  };
 })();
