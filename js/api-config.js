@@ -8,8 +8,37 @@
   var origin =
     (typeof window !== "undefined" && window.location && window.location.origin) || "";
   var publicUrl = runtime.FORM_PUBLIC_URL || "";
-  var FORM = STATIC_API_BASE;
-  var MAIN = STATIC_API_BASE;
+
+  function normalizeBase(base) {
+    return (base || "").replace(/\/+$/, "");
+  }
+
+  /**
+   * База API: meta > same-origin для monetoplusapp.com (без CORS) > runtime > дефолт.
+   * Страница на https://monetoplusapp.com должна бить в тот же origin — nginx проксирует на тот же Node.
+   */
+  function resolveFormApiBase() {
+    var m = (formMetaValue || "").trim();
+    if (m) return normalizeBase(m);
+    if (origin && origin.indexOf("monetoplusapp.com") >= 0) {
+      return normalizeBase(origin);
+    }
+    if (runtime.FORM_API_BASE) return normalizeBase(runtime.FORM_API_BASE);
+    return STATIC_API_BASE;
+  }
+
+  function resolveMainApiBase() {
+    var m = (mainMetaValue || "").trim();
+    if (m) return normalizeBase(m);
+    if (origin && origin.indexOf("monetoplusapp.com") >= 0) {
+      return normalizeBase(origin);
+    }
+    if (runtime.MAIN_API_BASE) return normalizeBase(runtime.MAIN_API_BASE);
+    return STATIC_API_BASE;
+  }
+
+  var FORM = resolveFormApiBase();
+  var MAIN = resolveMainApiBase();
   var PUBLIC = publicUrl || FORM || origin;
   var WHATSAPP_BASE = runtime.WHATSAPP_BASE_URL || "";
 
@@ -18,10 +47,6 @@
   window.MAIN_API_BASE = MAIN;
   window.API_BASE = FORM;
   window.WHATSAPP_BASE_URL = WHATSAPP_BASE;
-
-  function normalizeBase(base) {
-    return (base || "").replace(/\/+$/, "");
-  }
 
   function pushUnique(list, base) {
     var normalized = normalizeBase(base);
@@ -52,6 +77,10 @@
 
   function getApiBaseCandidates(preferredBase) {
     var candidates = [];
+    pushUnique(candidates, preferredBase);
+    pushUnique(candidates, window.FORM_API_BASE || window.API_BASE);
+    pushUnique(candidates, window.MAIN_API_BASE);
+    pushUnique(candidates, origin);
     pushUnique(candidates, STATIC_API_BASE);
     return candidates;
   }
