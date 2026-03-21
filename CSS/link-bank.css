@@ -1,0 +1,144 @@
+@import url("https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&display=swap");
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: #fafafa;
+  font-family: "DM Sans", sans-serif;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-inline: 16px;
+  margin-top: 16px;
+}
+
+.main {
+  margin-bottom: 16px;
+}
+
+.user {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.user__text-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.user__text-desc {
+  font-size: 14px;
+  color: #787878;
+}
+
+.link-bank {
+  padding: 16px;
+  display: flex;
+  justify-content: center;
+  flex-direction: column;
+  background-color: #fff;
+  margin-top: 32px;
+  border-radius: 16px;
+  margin-inline: 16px;
+}
+
+.link-bank__title {
+  font-size: 24px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.link-bank__desc {
+  font-size: 16px;
+  font-weight: 400;
+  text-align: center;
+  color: #787878;
+  margin-top: 12px;
+}
+
+.link-bank__image {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin-top: 36px;
+  width: 100%;
+  max-width: 338px;
+  aspect-ratio: 338 / 401;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.link-bank__note {
+    margin-top: 24px;
+    margin-bottom: 60px;
+}
+.link-bank__note-title {
+    font-style: normal;
+    font-weight: 400;
+    font-size: 14px;
+    line-height: 21px;
+    color: #9A9A9A;
+    width: 100%;
+    margin: 0;
+}
+
+.link-bank__note-text {
+    font-style: normal;
+    font-weight: 400;
+    font-size: 16px;
+    line-height: 24px;
+    color: #0F0F0F;
+    width: 100%;
+    margin: 0;
+}
+/* Bottom Background */
+.bottom-bg {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 480px;
+  height: 90px;
+  z-index: 999;
+  background: #FAFAFA;
+}
+
+/* Button (1:1 as question.html) */
+.btn {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: calc(100% - 40px);
+  z-index: 1000;
+}
+
+.footer__btn {
+  padding-block: 20px;
+  border: none;
+  border-radius: 14px;
+  font-size: 14px;
+  font-weight: 500;
+  color: #fff;
+  width: 100%;
+  max-width: 100%;
+  cursor: pointer;
+  box-sizing: border-box;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 118, 31, 1) 0%,
+    rgba(255, 119, 215, 1) 100%
+  );
+}

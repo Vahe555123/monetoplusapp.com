@@ -1,0 +1,252 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+    <link rel="stylesheet" href="./CSS/link-bank.css" />
+    <link rel="stylesheet" href="./CSS/card-component.css" />
+
+    <title>Dynamic UI</title>
+    <meta name="api-base" content="" />
+    <script src="./js/runtime-config.js?v=20260321-2"></script>
+    <script src="./js/api-config.js?v=20260321-2"></script>
+  </head>
+
+  <body>
+    <div class="header">
+      <div class="user">
+        <img src="./assets/profile.png" alt="" class="user__img" id="topDir" />
+        <div class="user__text">
+          <h1 class="user__text-title">Tu perfil</h1>
+          <p class="user__text-desc">Datos seguros</p>
+        </div>
+      </div>
+      <img src="./assets/Notification.png" alt="" class="header__notification" />
+    </div>
+
+    <div class="main">
+      <div class="link-bank">
+        <div class="link-bank__header">
+          <!-- ✅ эти id ты ищешь -->
+          <h2 class="link-bank__title" id="finalTitle">Obtén el informe completo</h2>
+          <p class="link-bank__desc" id="finalDesc">
+            Obtén un análisis más detallado basado en tus resultados.
+          </p>
+        </div>
+
+        <div class="link-bank__image">
+          <div class="card-component">
+            <div class="card-background-wrapper">
+              <img src="./assets/link-bg.png" alt="Card Background" class="card-background" />
+              <div class="card-overlay"></div>
+            </div>
+
+            <img src="./assets/link-women.png" alt="Woman" class="card-woman" />
+
+            <div class="card-content">
+              <!-- ✅ badge -->
+              <div class="card-badge">
+                <span class="card-badge-text" id="uiBadge">En línea</span>
+              </div>
+
+              <!-- ✅ title + subtitle -->
+              <div class="card-text-content">
+                <div class="card-text-wrapper">
+                  <h2 class="card-title" id="uiTitle">Tu Informe Completo</h2>
+                  <p class="card-subtitle" id="uiSubtitle">
+                    Solicítalo gratis y recíbelo al instante
+                  </p>
+                </div>
+              </div>
+
+              <!-- ✅ price + suffix -->
+              <div class="card-price">
+                <span class="currency">€</span>
+                <span id="uiPrice">00.00</span>
+                <span class="year" id="uiPriceSuffix">/ Informe</span>
+              </div>
+
+              <!-- ✅ features container -->
+              <div class="card-list" id="uiFeatures">
+                <div class="card-list-item">
+                  <img src="./assets/icons/tick-circle.svg" alt="" />
+                  <span class="card-list-text">Análisis claro</span>
+                </div>
+                <div class="card-list-item">
+                  <img src="./assets/icons/tick-circle.svg" alt="" />
+                  <span class="card-list-text">Ajuste a tus metas</span>
+                </div>
+                <div class="card-list-item">
+                  <img src="./assets/icons/tick-circle.svg" alt="" />
+                  <span class="card-list-text">Sin compromisos</span>
+                </div>
+                <div class="card-list-item">
+                  <img src="./assets/icons/tick-circle.svg" alt="" />
+                  <span class="card-list-text">Comunicación rápida</span>
+                </div>
+                <div class="card-list-item">
+                  <img src="./assets/icons/tick-circle.svg" alt="" />
+                  <span class="card-list-text">Confidencial</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ✅ comment -->
+        <div class="link-bank__note">
+          <p class="link-bank__note-title">Comentario</p>
+          <p class="link-bank__note-text" id="uiComment">
+            El informe tiene carácter informativo y no constituye una recomendación financiera.
+          </p>
+        </div>
+      </div>
+    </div>
+
+    <div class="bottom-bg"></div>
+
+    <div class="btn">
+      <!-- ✅ continueBtn у тебя уже был, оставляем -->
+      <button class="footer__btn" id="continueBtn">Continuar</button>
+    </div>
+
+    <script>
+      (function () {
+        var span = document.querySelector(".user__text-desc");
+        if (span) span.textContent = localStorage.getItem("inputName") || "Steve Young";
+
+        var dataRaw = localStorage.getItem("scratchVerify");
+
+        if (dataRaw) {
+          try {
+            var data = JSON.parse(dataRaw);
+            if (data.ui) {
+              var ui = data.ui;
+
+              var badge = document.getElementById("uiBadge");
+              var title = document.getElementById("uiTitle");
+              var subtitle = document.getElementById("uiSubtitle");
+              var price = document.getElementById("uiPrice");
+              var priceSuffix = document.getElementById("uiPriceSuffix");
+              var featuresBox = document.getElementById("uiFeatures");
+              var comment = document.getElementById("uiComment");
+              var finalTitle = document.getElementById("finalTitle");
+              var finalDesc = document.getElementById("finalDesc");
+
+              if (badge) badge.textContent = ui.badge || "";
+              if (title) title.textContent = ui.title || "";
+              if (subtitle) subtitle.innerHTML = (ui.subtitle || "").replace(/\n/g, "<br>");
+              if (finalTitle) finalTitle.textContent = ui.finalTitle || "";
+              if (finalDesc) finalDesc.textContent = ui.finalDesc || "";
+              if (price) price.textContent = ui.price || "";
+              if (priceSuffix) priceSuffix.textContent = ui.priceSuffix || "";
+              if (comment) comment.textContent = ui.comment || "";
+
+              if (featuresBox && Array.isArray(ui.features)) {
+                featuresBox.innerHTML = "";
+                ui.features.forEach(function (text) {
+                  var div = document.createElement("div");
+                  div.className = "card-list-item";
+                  div.innerHTML =
+                    '<img src="./assets/icons/tick-circle.svg" alt="">' +
+                    '<span class="card-list-text">' + text + '</span>';
+                  featuresBox.appendChild(div);
+                });
+              }
+            }
+          } catch (e) {
+            console.error("Error parsing scratchVerify:", e);
+          }
+        }
+
+        var continueBtn = document.getElementById("continueBtn");
+        if (continueBtn) {
+          var jobId = localStorage.getItem("lastJobId") || "";
+          // Mientras el bot procesa (~3 min), el botón abre WhatsApp con el ID de solicitud
+          var waBase =
+            (window.WHATSAPP_BASE_URL || "") +
+            encodeURIComponent(
+              "Hola, ya hay resultado de mi solicitud? ID " + (jobId || "-")
+            );
+          var resultadosUrl = null;
+          var pollTimer = null;
+
+          function setButtonToWhatsApp() {
+            continueBtn.textContent = "Continuar";
+            continueBtn.onclick = function () {
+              window.location.href = waBase;
+            };
+          }
+
+          function setButtonToResultados(url) {
+            if (pollTimer) clearInterval(pollTimer);
+            resultadosUrl = url;
+            continueBtn.textContent = "Ver resultados";
+            continueBtn.onclick = function () {
+              window.location.href = url;
+            };
+          }
+
+          function pollJobStatus() {
+            if (!jobId) return;
+            var apiUrl =
+              (window.FORM_API_BASE || window.API_BASE || window.location.origin) +
+              "/api/jobs/" +
+              encodeURIComponent(jobId);
+            fetch(apiUrl)
+              .then(function (r) {
+                return r.json();
+              })
+              .then(function (data) {
+                if (data && data.resultadosUrl) {
+                  setButtonToResultados(data.resultadosUrl);
+                }
+              })
+              .catch(function () {});
+          }
+
+          if (jobId) {
+            setButtonToWhatsApp();
+            pollJobStatus();
+            pollTimer = setInterval(pollJobStatus, 5000);
+          } else {
+            // Sin jobId: comportamiento anterior (volver al flujo)
+            continueBtn.addEventListener("click", function () {
+              var url = localStorage.getItem("url") || "comprehensive.html";
+              var email = localStorage.getItem("inputName") || "";
+              var phone = localStorage.getItem("inputPhone") || "";
+              if ((email || phone) && url.indexOf("comprehensive") >= 0) {
+                var sep = url.indexOf("?") >= 0 ? "&" : "?";
+                if (email) url += sep + "email=" + encodeURIComponent(email);
+                if (phone)
+                  url +=
+                    (url.indexOf("?") >= 0 ? "&" : "?") +
+                    "phone=" +
+                    encodeURIComponent(phone);
+              }
+              window.location.href = "./" + url;
+            });
+          }
+        }
+
+        var profileIcon = document.getElementById("topDir");
+        if (profileIcon) {
+          profileIcon.addEventListener("click", function () {
+            window.location.href = "profile-plan.html";
+          });
+        }
+
+        var notificationIcon = document.querySelector(".header__notification");
+        if (notificationIcon) {
+          notificationIcon.addEventListener("click", function () {
+            var supportBase = window.WHATSAPP_BASE_URL || "";
+            if (supportBase) {
+              window.location.href = supportBase + encodeURIComponent("Hola");
+            }
+          });
+        }
+      })();
+    </script>
+  </body>
+</html>
