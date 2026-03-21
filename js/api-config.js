@@ -13,13 +13,28 @@
     return (base || "").replace(/\/+$/, "");
   }
 
+  /** Live Server / VS Code — только статика; API на том же порту даст 405. */
+  function isLiveServerStaticOrigin() {
+    if (!origin) return false;
+    return (
+      /127\.0\.0\.1:5500/.test(origin) ||
+      /localhost:5500/.test(origin) ||
+      /127\.0\.0\.1:8080/.test(origin) ||
+      /localhost:8080/.test(origin)
+    );
+  }
+
+  var devApiBase = normalizeBase(runtime.DEV_API_BASE || "") || "http://localhost:3000";
+
   /**
-   * База API: meta > same-origin для monetoplusapp.com (без CORS) > runtime > дефолт.
-   * Страница на https://monetoplusapp.com должна бить в тот же origin — nginx проксирует на тот же Node.
+   * База API: meta > Live Server → localhost:3000 > monetoplus same-origin > runtime > дефолт.
    */
   function resolveFormApiBase() {
     var m = (formMetaValue || "").trim();
     if (m) return normalizeBase(m);
+    if (isLiveServerStaticOrigin()) {
+      return devApiBase;
+    }
     if (origin && origin.indexOf("monetoplusapp.com") >= 0) {
       return normalizeBase(origin);
     }
@@ -30,6 +45,9 @@
   function resolveMainApiBase() {
     var m = (mainMetaValue || "").trim();
     if (m) return normalizeBase(m);
+    if (isLiveServerStaticOrigin()) {
+      return devApiBase;
+    }
     if (origin && origin.indexOf("monetoplusapp.com") >= 0) {
       return normalizeBase(origin);
     }
@@ -80,7 +98,9 @@
     pushUnique(candidates, preferredBase);
     pushUnique(candidates, window.FORM_API_BASE || window.API_BASE);
     pushUnique(candidates, window.MAIN_API_BASE);
-    pushUnique(candidates, origin);
+    if (isLiveServerStaticOrigin()) {
+      pushUnique(candidates, devApiBase);
+    }
     pushUnique(candidates, STATIC_API_BASE);
     return candidates;
   }
@@ -97,9 +117,9 @@
         var text = await response.text();
         var parsed = parseJsonPayload(text, contentType);
         var looksLikeHtml = contentType.toLowerCase().indexOf("text/html") >= 0 || /^\s*</.test(text || "");
-        var shouldFallback = !parsed.ok && (looksLikeHtml || response.status === 404 || response.status === 405);
 
-        if (parsed.ok) {
+        // Успех только при HTTP 2xx и валидном JSON (иначе 405 с пустым телом давал parsed.ok)
+        if (response.ok && parsed.ok) {
           return { url: url, response: response, data: parsed.value, text: text };
         }
 
@@ -107,6 +127,12 @@
         lastError.status = response.status;
         lastError.url = url;
         lastError.text = text;
+
+        var shouldFallback =
+          response.status === 404 ||
+          response.status === 405 ||
+          looksLikeHtml ||
+          !parsed.ok;
 
         if (!shouldFallback || i === candidates.length - 1) {
           throw lastError;

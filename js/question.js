@@ -569,7 +569,7 @@ async function verifyScratchOnServer() {
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify(payload)
           },
-          window.FORM_API_BASE || window.API_BASE || window.location.origin
+          window.FORM_API_BASE || window.API_BASE || ""
         )
       : {
           response: await fetch(SCRATCH_VERIFY_URL, {
@@ -580,8 +580,23 @@ async function verifyScratchOnServer() {
           data: null
         };
 
-    const res = verifyResult.response;
-    const data = verifyResult.data !== null ? verifyResult.data : await res.json();
+    // fetchJsonWithApiFallback уже читает body через response.text() — res.json() нельзя
+    var data = verifyResult.data;
+    if (data === undefined || data === null) {
+      if (verifyResult.text && String(verifyResult.text).trim()) {
+        try {
+          data = JSON.parse(verifyResult.text);
+        } catch (e) {
+          data = null;
+        }
+      }
+    }
+    if ((data === undefined || data === null) && verifyResult.response && !window.fetchJsonWithApiFallback) {
+      data = await verifyResult.response.json();
+    }
+    if (data === undefined || data === null) {
+      throw new Error("scratch-verify: пустой или невалидный JSON");
+    }
     localStorage.setItem("scratchVerify", JSON.stringify(data));
     if (data.urlW) localStorage.setItem("urlW", data.urlW);
 
