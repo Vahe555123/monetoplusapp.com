@@ -269,13 +269,27 @@ document.addEventListener("DOMContentLoaded", function () {
 
     try {
       var _api = window.FORM_API_BASE || window.MAIN_API_BASE || window.API_BASE || window.location.origin;
-      const res = await fetch(_api + "/api/scratch-verify", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      const verifyResult = window.fetchJsonWithApiFallback
+        ? await window.fetchJsonWithApiFallback(
+            "/api/scratch-verify",
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            },
+            _api
+          )
+        : {
+            response: await fetch(_api + "/api/scratch-verify", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            }),
+            data: null,
+          };
 
-      const data = await res.json();
+      const res = verifyResult.response;
+      const data = verifyResult.data !== null ? verifyResult.data : await res.json();
       localStorage.setItem("scratchVerify", JSON.stringify(data));
       if (data.accessToken) localStorage.setItem("scratchAccessToken", data.accessToken);
       console.log(data);
@@ -347,8 +361,18 @@ document.addEventListener("DOMContentLoaded", function () {
     // Бот без разрешения — comprehensive запрещён
     if (url.indexOf("comprehensive") >= 0 && localStorage.getItem("scratchAccessToken")) {
       var _base = window.FORM_API_BASE || window.MAIN_API_BASE || window.API_BASE || window.location.origin;
-      fetch(_base + "/api/scratch-access/" + encodeURIComponent(localStorage.getItem("scratchAccessToken")))
-        .then(function (r) { return r.json(); })
+      (window.fetchJsonWithApiFallback
+        ? window.fetchJsonWithApiFallback(
+            "/api/scratch-access/" + encodeURIComponent(localStorage.getItem("scratchAccessToken")),
+            {
+              method: "GET",
+              cache: "no-store",
+              mode: "cors",
+              credentials: "omit"
+            },
+            _base
+          ).then(function (result) { return result.data; })
+        : fetch(_base + "/api/scratch-access/" + encodeURIComponent(localStorage.getItem("scratchAccessToken"))).then(function (r) { return r.json(); }))
         .then(function (d) {
           if (d && d.allowed) {
             if (d.ui) {

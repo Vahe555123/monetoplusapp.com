@@ -48,14 +48,29 @@
     };
 
     try {
-      fetch(API_BASE + EVENT_ENDPOINT, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-        mode: "cors",
-        credentials: "omit",
-        keepalive: true
-      }).catch(function () {});
+      if (root.fetchWithApiFallback) {
+        root.fetchWithApiFallback(
+          EVENT_ENDPOINT,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+            mode: "cors",
+            credentials: "omit",
+            keepalive: true
+          },
+          API_BASE
+        ).catch(function () {});
+      } else {
+        fetch(API_BASE + EVENT_ENDPOINT, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+          mode: "cors",
+          credentials: "omit",
+          keepalive: true
+        }).catch(function () {});
+      }
     } catch (_) {}
   }
 

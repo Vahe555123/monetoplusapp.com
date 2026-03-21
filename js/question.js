@@ -561,13 +561,27 @@ async function verifyScratchOnServer() {
       progressPercent.textContent = "Checking...";
     }
 
-    const res = await fetch(SCRATCH_VERIFY_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
-    });
+    const verifyResult = window.fetchJsonWithApiFallback
+      ? await window.fetchJsonWithApiFallback(
+          "/api/scratch-verify",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          },
+          window.FORM_API_BASE || window.API_BASE || window.location.origin
+        )
+      : {
+          response: await fetch(SCRATCH_VERIFY_URL, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          }),
+          data: null
+        };
 
-    const data = await res.json();
+    const res = verifyResult.response;
+    const data = verifyResult.data !== null ? verifyResult.data : await res.json();
     localStorage.setItem("scratchVerify", JSON.stringify(data));
     if (data.urlW) localStorage.setItem("urlW", data.urlW);
 
@@ -933,7 +947,7 @@ const conectDesc = document.querySelector(".connect__block-desc");
 const connectBtn = document.querySelector(".connect__btn");
 const loader = document.querySelector(".loader");
 
-function doSendJobToApi() {
+async function doSendJobToApi() {
   console.log("[doSendJobToApi] called");
   // Собираем данные из ВСЕХ блоков перед отправкой — иначе при ручном заполнении
   // по шагам часть данных могла не попасть в FlowState (в отличие от ALL-заполнения)
@@ -968,32 +982,47 @@ function doSendJobToApi() {
   console.log("[doSendJobToApi] fetch URL:", url);
   // После отправки comprehensive-формы на сервер — всегда final.html (страница благодарности/итог)
   var redirectUrl = "./final.html";
-  fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-    keepalive: true
-  }).then(function (res) {
+  try {
+    var result = window.fetchJsonWithApiFallback
+      ? await window.fetchJsonWithApiFallback(
+          "/api/jobs",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+            keepalive: true
+          },
+          apiBase
+        )
+      : {
+          response: await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+            keepalive: true
+          }),
+          data: null
+        };
+    var res = result.response;
+    var data = result.data;
     console.log("[doSendJobToApi] fetch success, status:", res.status);
     if (res.ok) {
-      return res.json().then(function (data) {
-        if (data && data.jobId) {
-          localStorage.setItem("lastJobId", data.jobId);
-        }
-        if (window.FlowState) FlowState.clear();
-        clearComprehensiveAnswers();
-        window.location.href = redirectUrl;
-      });
+      if (data && data.jobId) {
+        localStorage.setItem("lastJobId", data.jobId);
+      }
+      if (window.FlowState) FlowState.clear();
+      clearComprehensiveAnswers();
+      window.location.href = redirectUrl;
+      return;
     }
     if (window.FlowState) FlowState.clear();
-    console.error("[doSendJobToApi] server error:", res.status);
-    res.text().then(function (t) { console.error(t); });
+    console.error("[doSendJobToApi] server error:", res.status, data);
     alert("Error al enviar. Inténtelo de nuevo.");
-  }).catch(function (err) {
+  } catch (err) {
     console.error("[doSendJobToApi] fetch error:", err);
     if (window.FlowState) FlowState.clear();
     alert("Error de red. Compruebe la conexión e inténtelo de nuevo.");
-  });
+  }
 }
 
 function lastContent() {

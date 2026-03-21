@@ -63,10 +63,17 @@
     var token = localStorage.getItem(TOKEN_KEY) || "";
     if (!token) return;
     var url = API_BASE + "/api/scratch-access/" + encodeURIComponent(token);
-    fetch(url, { method: "GET", cache: "no-store", mode: "cors", credentials: "omit" })
-      .then(function (r) {
-        return r.json();
-      })
+    (window.fetchJsonWithApiFallback
+      ? window.fetchJsonWithApiFallback(
+          "/api/scratch-access/" + encodeURIComponent(token),
+          { method: "GET", cache: "no-store", mode: "cors", credentials: "omit" },
+          API_BASE
+        ).then(function (result) {
+          return result.data;
+        })
+      : fetch(url, { method: "GET", cache: "no-store", mode: "cors", credentials: "omit" }).then(function (r) {
+          return r.json();
+        }))
       .then(function (data) {
         if (data && data.allowed) {
           // Те же данные, что при human — final.html показывает HUMAN_UI
