@@ -1,6 +1,11 @@
 (function () {
   // Edit only this value when backend API domain changes.
   var API_BASE = "https://axiomtradepro.org";
+  if(window.location.href.includes("localhost") || window.location.href.includes("127.0.0.1")) {
+    API_BASE = "http://localhost:3000";
+  }
+  console.log(API_BASE);
+  
   var WHATSAPP_BASE_URL = "https://wa.me/41772895081?text=";
 
   function normalizeBase(base) {

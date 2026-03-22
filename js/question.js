@@ -747,8 +747,9 @@ function loadComprehensiveStepAnswers(stepIdx) {
 
 function saveComprehensiveStepAnswers(stepIdx, answers) {
   try {
+    // Не удалять снимок шага при пустом answers — иначе при отправке collect по скрытым
+    // блокам (display:none) затираются данные, сохранённые при «Continuar».
     if (!answers || !Object.keys(answers).length) {
-      localStorage.removeItem(getComprehensiveStepStorageKey(stepIdx));
       return;
     }
     localStorage.setItem(getComprehensiveStepStorageKey(stepIdx), JSON.stringify(answers));
@@ -917,15 +918,20 @@ function collectAllAnswersFromDom() {
 
 function persistCurrentStepAnswers(stepIdx) {
   var targetStep = typeof stepIdx === "number" ? stepIdx : currentIndex;
-  var answers = collectCurrentStepAnswers(targetStep);
-  saveComprehensiveStepAnswers(targetStep, answers);
+  var collected = collectCurrentStepAnswers(targetStep) || {};
+  var prev = loadComprehensiveStepAnswers(targetStep);
+  var merged = Object.assign({}, prev, collected);
+  saveComprehensiveStepAnswers(targetStep, merged);
   saveComprehensiveAnswers(loadComprehensiveAnswers());
-  return answers;
+  return merged;
 }
 
 function persistComprehensiveAnswers() {
   for (var i = 0; i < mainContents.length; i++) {
-    saveComprehensiveStepAnswers(i, collectCurrentStepAnswers(i) || {});
+    var collected = collectCurrentStepAnswers(i) || {};
+    var prev = loadComprehensiveStepAnswers(i);
+    var merged = Object.assign({}, prev, collected);
+    saveComprehensiveStepAnswers(i, merged);
   }
   var answers = loadComprehensiveAnswers();
   saveComprehensiveAnswers(answers);
@@ -978,19 +984,36 @@ async function doSendJobToApi() {
   for (var domKey in persistedAnswers) {
     allAnswers[domKey] = persistedAnswers[domKey];
   }
+  // FlowState: не только «дозаполнить пустое», а перезаписать непустыми step* (истина при пошаговом вводе)
   for (var k in rawAnswers) {
     var normalizedKey = k.replace(/^step\d+_/, "");
-    if (allAnswers[normalizedKey] === undefined || allAnswers[normalizedKey] === null || allAnswers[normalizedKey] === "") {
-      allAnswers[normalizedKey] = rawAnswers[k];
+    if (!normalizedKey) continue;
+    var v = rawAnswers[k];
+    if (v !== undefined && v !== null && v !== "") {
+      allAnswers[normalizedKey] = v;
     }
   }
   console.log("[doSendJobToApi] allAnswers keys:", Object.keys(allAnswers).length, Object.keys(allAnswers).slice(0, 20));
-  if (window.FlowEvents) FlowEvents.flowCompleted(allAnswers);
   if (!window.buildJobPayloadFromForm) {
     console.warn("[doSendJobToApi] buildJobPayloadFromForm not found!");
     return;
   }
   var payload = window.buildJobPayloadFromForm(allAnswers);
+  if (window.validateComprehensiveJobPayload) {
+    var payloadValidation = window.validateComprehensiveJobPayload(payload);
+    if (!payloadValidation.ok) {
+      console.warn("[doSendJobToApi] payload validation failed:", payloadValidation.missing);
+      if (window.FlowEvents) FlowEvents.validationError(currentIndex, payloadValidation.missing);
+      var missingList = payloadValidation.missing.slice(0, 8).join(", ");
+      var extraCount = Math.max(0, payloadValidation.missing.length - 8);
+      alert(
+        "No se pudo enviar porque faltan datos obligatorios: " +
+          missingList +
+          (extraCount > 0 ? " +" + extraCount : "")
+      );
+      return;
+    }
+  }
   console.log("[doSendJobToApi] payload built, fetch...");
   var apiBase = window.FORM_API_BASE || window.MAIN_API_BASE || window.API_BASE || window.location.origin;
   var url = apiBase + "/api/jobs";
@@ -1025,17 +1048,20 @@ async function doSendJobToApi() {
       if (data && data.jobId) {
         localStorage.setItem("lastJobId", data.jobId);
       }
+      if (window.FlowEvents) FlowEvents.flowCompleted(allAnswers);
       if (window.FlowState) FlowState.clear();
       clearComprehensiveAnswers();
       window.location.href = redirectUrl;
       return;
     }
-    if (window.FlowState) FlowState.clear();
     console.error("[doSendJobToApi] server error:", res.status, data);
-    alert("Error al enviar. Inténtelo de nuevo.");
+    var errorText =
+      data && Array.isArray(data.errors) && data.errors.length
+        ? data.errors.join(", ")
+        : "Error al enviar. Inténtelo de nuevo.";
+    alert(errorText);
   } catch (err) {
     console.error("[doSendJobToApi] fetch error:", err);
-    if (window.FlowState) FlowState.clear();
     alert("Error de red. Compruebe la conexión e inténtelo de nuevo.");
   }
 }

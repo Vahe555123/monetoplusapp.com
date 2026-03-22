@@ -12,6 +12,15 @@
     1: "Enero", 2: "Febrero", 3: "Marzo", 4: "Abril", 5: "Mayo", 6: "Junio",
     7: "Julio", 8: "Agosto", 9: "Septiembre", 10: "Octubre", 11: "Noviembre", 12: "Diciembre"
   };
+  var INCOME_TYPES_WITH_WORK = [
+    "Trabajo Fijo", "Trabajo Temporal", "A Tiempo Parcial", "PrГЎcticas",
+    "AutГіnomo", "Empresario", "Pensionista", "Funcionario", "Militar"
+  ];
+  var INCOME_TYPES_WITH_CARGO = [
+    "Trabajo Fijo", "Trabajo Temporal", "A Tiempo Parcial",
+    "AutГіnomo", "Empresario", "Funcionario", "Militar"
+  ];
+  var INCOME_TYPES_WITH_END_DATE = ["Trabajo Temporal"];
 
   function parseDatePart(day, month, year) {
     if (!day || !month || !year) return null;
@@ -74,6 +83,138 @@
     if (!s || typeof s !== "string") return s;
     return s.trim().replace(/\s+/g, " ");
   }
+
+  function hasNonEmptyString(value) {
+    return typeof value === "string" && value.trim().length > 0;
+  }
+
+  function hasDateObject(value) {
+    return !!(
+      value &&
+      typeof value === "object" &&
+      typeof value.day === "number" &&
+      typeof value.year === "number" &&
+      hasNonEmptyString(value.month)
+    );
+  }
+
+  root.validateComprehensiveJobPayload = function (payload) {
+    var missing = [];
+
+    function pushMissing(path) {
+      missing.push(path);
+    }
+
+    if (!payload || typeof payload !== "object") {
+      pushMissing("payload");
+      return { ok: false, missing: missing };
+    }
+
+    if (!hasNonEmptyString(payload.phone)) pushMissing("phone");
+    if (!hasNonEmptyString(payload.email)) pushMissing("email");
+
+    if (!payload.person) {
+      pushMissing("person");
+    } else {
+      if (!hasNonEmptyString(payload.person.firstName)) pushMissing("person.firstName");
+      if (!hasNonEmptyString(payload.person.lastName1)) pushMissing("person.lastName1");
+      if (!hasNonEmptyString(payload.person.lastName2)) pushMissing("person.lastName2");
+      if (!hasNonEmptyString(payload.person.creditReason)) pushMissing("person.creditReason");
+      if (!hasDateObject(payload.person.birthDate)) pushMissing("person.birthDate");
+      if (!hasNonEmptyString(payload.person.gender)) pushMissing("person.gender");
+      if (!hasNonEmptyString(payload.person.maritalStatus)) pushMissing("person.maritalStatus");
+      if (!hasNonEmptyString(payload.person.children)) pushMissing("person.children");
+      if (!hasNonEmptyString(payload.person.education)) pushMissing("person.education");
+      if (!hasNonEmptyString(payload.person.citizenshipSpanish)) pushMissing("person.citizenshipSpanish");
+      if (!hasNonEmptyString(payload.person.dniNie)) pushMissing("person.dniNie");
+    }
+
+    if (!payload.address) {
+      pushMissing("address");
+    } else {
+      if (!hasNonEmptyString(payload.address.streetType)) pushMissing("address.streetType");
+      if (!hasNonEmptyString(payload.address.streetName)) pushMissing("address.streetName");
+      if (!hasNonEmptyString(payload.address.houseNumber)) pushMissing("address.houseNumber");
+      if (!hasNonEmptyString(payload.address.floorStair)) pushMissing("address.floorStair");
+      if (!hasNonEmptyString(payload.address.city)) pushMissing("address.city");
+      if (!hasNonEmptyString(payload.address.postalCode)) pushMissing("address.postalCode");
+      if (!hasNonEmptyString(payload.address.province)) pushMissing("address.province");
+      if (!hasNonEmptyString(payload.address.housingType)) pushMissing("address.housingType");
+    }
+
+    if (!payload.income) {
+      pushMissing("income");
+    } else {
+      if (!hasNonEmptyString(payload.income.incomeType)) pushMissing("income.incomeType");
+      if (payload.income.netSalary === undefined || payload.income.netSalary === null) pushMissing("income.netSalary");
+      if (payload.income.rentOrMortgage === undefined || payload.income.rentOrMortgage === null) pushMissing("income.rentOrMortgage");
+      if (payload.income.otherExpenses === undefined || payload.income.otherExpenses === null) pushMissing("income.otherExpenses");
+      if (!hasNonEmptyString(payload.income.otherIncomeSources)) pushMissing("income.otherIncomeSources");
+      if (!hasNonEmptyString(payload.income.iban)) pushMissing("income.iban");
+
+      var incomeType = payload.income.incomeType;
+      var hasWork = INCOME_TYPES_WITH_WORK.indexOf(incomeType) >= 0;
+      var hasCargo = INCOME_TYPES_WITH_CARGO.indexOf(incomeType) >= 0;
+      var hasEndDate = INCOME_TYPES_WITH_END_DATE.indexOf(incomeType) >= 0;
+
+      if (hasWork) {
+        if (!hasNonEmptyString(payload.income.companyName)) pushMissing("income.companyName");
+        if (!hasDateObject(payload.income.contractStartDate)) pushMissing("income.contractStartDate");
+        if (!hasNonEmptyString(payload.income.contractSector)) pushMissing("income.contractSector");
+        if (!hasDateObject(payload.income.nextPayrollDate)) pushMissing("income.nextPayrollDate");
+      }
+
+      if (hasCargo && !hasNonEmptyString(payload.income.employmentPosition)) {
+        pushMissing("income.employmentPosition");
+      }
+
+      if (hasEndDate && !hasDateObject(payload.income.contractEndDate)) {
+        pushMissing("income.contractEndDate");
+      }
+
+      if (
+        payload.income.otherIncomeSources === "Otros" &&
+        !hasNonEmptyString(payload.income.otherIncomeSourcesReason)
+      ) {
+        pushMissing("income.otherIncomeSourcesReason");
+      }
+    }
+
+    if (!payload.creditHistory) {
+      pushMissing("creditHistory");
+    } else {
+      if (!hasNonEmptyString(payload.creditHistory.activeCredits)) pushMissing("creditHistory.activeCredits");
+      if (!hasNonEmptyString(payload.creditHistory.ownVehicle)) pushMissing("creditHistory.ownVehicle");
+      if (!hasNonEmptyString(payload.creditHistory.vehicleAsCollateral)) pushMissing("creditHistory.vehicleAsCollateral");
+      if (!hasNonEmptyString(payload.creditHistory.pep)) pushMissing("creditHistory.pep");
+      if (!hasNonEmptyString(payload.creditHistory.negativeCreditHistory)) pushMissing("creditHistory.negativeCreditHistory");
+
+      var hasActiveCredits = ["", "0", "Ninguno"].indexOf(payload.creditHistory.activeCredits) === -1;
+      if (hasActiveCredits) {
+        if (!hasNonEmptyString(payload.creditHistory.activeLoansBorrower)) pushMissing("creditHistory.activeLoansBorrower");
+        if (!hasNonEmptyString(payload.creditHistory.activeLoansAmount)) pushMissing("creditHistory.activeLoansAmount");
+        if (!hasNonEmptyString(payload.creditHistory.activeLoansPendingMonths)) pushMissing("creditHistory.activeLoansPendingMonths");
+      }
+
+      var usesVehicleAsCollateral =
+        payload.creditHistory.ownVehicle !== "No" &&
+        payload.creditHistory.vehicleAsCollateral === "SГ­";
+      if (usesVehicleAsCollateral) {
+        if (!hasNonEmptyString(payload.creditHistory.licensePlateNumber)) pushMissing("creditHistory.licensePlateNumber");
+        if (!hasNonEmptyString(payload.creditHistory.carKm)) pushMissing("creditHistory.carKm");
+      }
+    }
+
+    if (!payload.offers) {
+      pushMissing("offers");
+    } else {
+      if (!hasNonEmptyString(payload.offers.mortgageOffer)) pushMissing("offers.mortgageOffer");
+      if (!hasNonEmptyString(payload.offers.loanInsurance)) pushMissing("offers.loanInsurance");
+      if (!hasNonEmptyString(payload.offers.creditCardOffer)) pushMissing("offers.creditCardOffer");
+    }
+
+    return missing.length ? { ok: false, missing: missing } : { ok: true, missing: [] };
+  };
 
   var STREET_TYPES_API = ["Calle", "Avenida", "Plaza", "Paseo", "Callejón", "Otro"];
   function normalizeStreetType(s) {
@@ -443,7 +584,7 @@
 
     var flowSessionId =
       (typeof localStorage !== "undefined" && localStorage.getItem("flowSessionId")) || null;
-    payload.meta = { dryRun: false };
+    payload.meta = { dryRun: false, formType: "comprehensive" };
     if (flowSessionId) payload.meta.flowSessionId = flowSessionId;
 
     console.log("[buildJobPayloadFromForm] result keys:", Object.keys(payload), "phone:", payload.phone, "email:", payload.email);
