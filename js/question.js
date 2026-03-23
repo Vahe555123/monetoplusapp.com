@@ -1172,7 +1172,10 @@ function isFutureDate(day, month, year) {
 function isPastDate(day, month, year) {
   if (!day || !month || !year) return true;
   const myDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
-  return myDate < new Date();
+  const today = new Date();
+  myDate.setHours(0, 0, 0, 0);
+  today.setHours(0, 0, 0, 0);
+  return myDate <= today;
 }
 
 function isIbanValid(val) {
@@ -1567,8 +1570,8 @@ function displayEmploymentType(form) {
   });
 }
 
-/** Дни: если текущий месяц — от сегодня до конца; иначе 1..последний день (для date и nomina) */
-function getRestrictedFutureDays(monthNum, year) {
+/** Дни: если текущий месяц — от today/tomorrow до конца; иначе 1..последний день */
+function getRestrictedFutureDays(monthNum, year, excludeToday) {
   var now = new Date();
   var currentYear = now.getFullYear();
   var currentMonth = now.getMonth() + 1;
@@ -1576,7 +1579,10 @@ function getRestrictedFutureDays(monthNum, year) {
   var m = parseInt(monthNum, 10) || currentMonth;
   var y = parseInt(year, 10) || currentYear;
   var lastDay = new Date(y, m, 0).getDate();
-  var startDay = (y === currentYear && m === currentMonth) ? today : 1;
+  var startDay = 1;
+  if (y === currentYear && m === currentMonth) {
+    startDay = excludeToday ? (today + 1) : today;
+  }
   var out = [];
   for (var d = startDay; d <= lastDay; d++) {
     out.push(String(d).padStart(2, "0"));
@@ -1595,12 +1601,47 @@ function getRestrictedFutureMonths() {
   });
 }
 
+function getRestrictedPastDays(monthNum, year) {
+  var now = new Date();
+  var currentYear = now.getFullYear();
+  var currentMonth = now.getMonth() + 1;
+  var today = now.getDate();
+  var m = parseInt(monthNum, 10) || currentMonth;
+  var y = parseInt(year, 10) || currentYear;
+  var lastDay = new Date(y, m, 0).getDate();
+  var endDay = y === currentYear ? today : lastDay;
+  var out = [];
+  for (var d = 1; d <= endDay; d++) {
+    out.push(String(d).padStart(2, "0"));
+  }
+  return out;
+}
+
+function getRestrictedPastMonths(year) {
+  var now = new Date();
+  var currentYear = now.getFullYear();
+  var currentMonth = now.getMonth() + 1;
+  var y = parseInt(year, 10) || currentYear;
+  var names = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+  var out = [];
+  if (y === currentYear) {
+    for (var month = currentMonth; month >= 1; month--) {
+      out.push({ name: names[month - 1], value: String(month).padStart(2, "0") });
+    }
+    return out;
+  }
+  for (var i = 1; i <= 12; i++) {
+    out.push({ name: names[i - 1], value: String(i).padStart(2, "0") });
+  }
+  return out;
+}
+
 /** prefix: "date" или "nomina" */
 function populateRestrictedFutureDays(dayListEl, dateField, prefix) {
   if (!dayListEl || !dateField || !prefix) return;
   var monthVal = dateField.querySelector("[data-dropdown='" + prefix + "-month'] .credit-form__value")?.getAttribute("data-value");
   var yearVal = dateField.querySelector("[data-dropdown='" + prefix + "-year'] .credit-form__value")?.getAttribute("data-value") || String(new Date().getFullYear());
-  var days = getRestrictedFutureDays(monthVal, yearVal);
+  var days = getRestrictedFutureDays(monthVal, yearVal, prefix === "nomina");
   dayListEl.innerHTML = "";
   days.forEach(function (v) {
     var opt = document.createElement("div");
@@ -1611,9 +1652,69 @@ function populateRestrictedFutureDays(dayListEl, dateField, prefix) {
   });
 }
 
-function getNominaDays(m, y) { return getRestrictedFutureDays(m, y); }
+function getNominaDays(m, y) { return getRestrictedFutureDays(m, y, true); }
 function getNominaMonths() { return getRestrictedFutureMonths(); }
 function populateNominaDays(el, f) { return populateRestrictedFutureDays(el, f, "nomina"); }
+
+function filterDropdownOptionsByValues(listEl, allowedValues) {
+  if (!listEl) return;
+  var allowedSet = new Set((allowedValues || []).map(function (v) { return String(v); }));
+  var options = Array.from(listEl.querySelectorAll(".credit-form__dropdown-option"));
+  options.forEach(function (opt) {
+    var value = String(opt.getAttribute("data-value") || "");
+    opt.style.display = allowedSet.has(value) ? "" : "none";
+  });
+  (allowedValues || []).forEach(function (value) {
+    var stringValue = String(value);
+    var match = options.find(function (opt) {
+      return String(opt.getAttribute("data-value") || "") === stringValue;
+    });
+    if (match) {
+      listEl.appendChild(match);
+    }
+  });
+}
+
+function resetDateDropdownSelection(dateField, prefix, part, placeholder) {
+  if (!dateField || !prefix || !part) return;
+  var valueEl = dateField.querySelector("[data-dropdown='" + prefix + "-" + part + "'] .credit-form__value");
+  if (!valueEl) return;
+  valueEl.textContent = placeholder;
+  valueEl.setAttribute("data-value", "");
+  valueEl.setAttribute("data-empty", "true");
+}
+
+function syncContratoDateRestrictions(dateField) {
+  if (!dateField) return;
+
+  var yearEl = dateField.querySelector("[data-dropdown='contrato-year'] .credit-form__value");
+  var monthEl = dateField.querySelector("[data-dropdown='contrato-month'] .credit-form__value");
+  var dayEl = dateField.querySelector("[data-dropdown='contrato-day'] .credit-form__value");
+  if (!yearEl || !monthEl || !dayEl) return;
+
+  var yearVal = yearEl.getAttribute("data-value") || yearEl.textContent || "";
+  var monthVal = monthEl.getAttribute("data-value") || monthEl.textContent || "";
+  var dayVal = dayEl.getAttribute("data-value") || dayEl.textContent || "";
+
+  var monthList = dateField.querySelector(".credit-form__date-list-wrap[data-date-list='contrato-month'] .credit-form__dropdown-list");
+  var allowedMonths = getRestrictedPastMonths(yearVal).map(function (m) { return m.value; });
+  filterDropdownOptionsByValues(monthList, allowedMonths);
+
+  if (monthEl.getAttribute("data-empty") !== "true" && allowedMonths.indexOf(monthVal) === -1) {
+    resetDateDropdownSelection(dateField, "contrato", "month", "Mes");
+    resetDateDropdownSelection(dateField, "contrato", "day", "Dia");
+    monthVal = "";
+    dayVal = "";
+  }
+
+  var dayList = dateField.querySelector(".credit-form__date-list-wrap[data-date-list='contrato-day'] .credit-form__dropdown-list");
+  var allowedDays = getRestrictedPastDays(monthVal, yearVal);
+  filterDropdownOptionsByValues(dayList, allowedDays);
+
+  if (dayEl.getAttribute("data-empty") !== "true" && allowedDays.indexOf(dayVal) === -1) {
+    resetDateDropdownSelection(dateField, "contrato", "day", "Dia");
+  }
+}
 
 function initCreditForm() {
   const MONTHS_ES = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
@@ -1717,6 +1818,11 @@ yearLists.forEach((yearList) => {
     displayCreditosActivos(form);
     displayVehiculoAval(form);
   });
+  document.querySelectorAll(".credit-form__field[data-required-date]").forEach((field) => {
+    if (field.querySelector("[data-dropdown='contrato-day']")) {
+      syncContratoDateRestrictions(field);
+    }
+  });
 
   document.querySelectorAll(".credit-form__dropdown").forEach((dd) => {
     const wrap = dd.querySelector(".credit-form__input-wrap");
@@ -1740,6 +1846,11 @@ yearLists.forEach((yearList) => {
         if (dayDropdown === "nomina-day" && dateField) {
           var dayListEl = dateField.querySelector(".credit-form__date-list-wrap[data-date-list='nomina-day'] .credit-form__dropdown-list");
           if (dayListEl) populateRestrictedFutureDays(dayListEl, dateField, "nomina");
+        } else if (
+          dateField &&
+          (dayDropdown === "contrato-day" || dayDropdown === "contrato-month" || dayDropdown === "contrato-year")
+        ) {
+          syncContratoDateRestrictions(dateField);
         }
         dd.classList.add("is-open");
         if (dateField) {
@@ -1756,7 +1867,11 @@ yearLists.forEach((yearList) => {
       }
     });
 
-    if (dd.getAttribute("data-dropdown") === "date-day" || dd.getAttribute("data-dropdown") === "nomina-day") {
+    if (
+      dd.getAttribute("data-dropdown") === "date-day" ||
+      dd.getAttribute("data-dropdown") === "nomina-day" ||
+      dd.getAttribute("data-dropdown") === "contrato-day"
+    ) {
       var dayListWrap = listWrap;
       if (dayListWrap) {
         dayListWrap.addEventListener("click", function (ev) {
@@ -1781,7 +1896,11 @@ yearLists.forEach((yearList) => {
       }
     }
     options.forEach((opt) => {
-      if (dd.getAttribute("data-dropdown") === "date-day" || dd.getAttribute("data-dropdown") === "nomina-day") return;
+      if (
+        dd.getAttribute("data-dropdown") === "date-day" ||
+        dd.getAttribute("data-dropdown") === "nomina-day" ||
+        dd.getAttribute("data-dropdown") === "contrato-day"
+      ) return;
       opt.addEventListener("click", (e) => {
         e.stopPropagation();
         const v = opt.getAttribute("data-value");
@@ -1899,7 +2018,7 @@ yearLists.forEach((yearList) => {
               var dayVal = dayValEl?.getAttribute("data-value");
               var monthVal = df.querySelector("[data-dropdown='nomina-month'] .credit-form__value")?.getAttribute("data-value");
               var yearVal = df.querySelector("[data-dropdown='nomina-year'] .credit-form__value")?.getAttribute("data-value");
-              var days = getRestrictedFutureDays(monthVal, yearVal);
+              var days = getRestrictedFutureDays(monthVal, yearVal, true);
               if (dayVal && days.indexOf(dayVal) === -1) {
                 if (dayValEl) {
                   dayValEl.textContent = "Día";
@@ -1908,6 +2027,12 @@ yearLists.forEach((yearList) => {
                 }
               }
             }
+          }
+        }
+        if (ddName === "contrato-month" || ddName === "contrato-year") {
+          var contratoField = dd.closest("[data-required-date]");
+          if (contratoField) {
+            syncContratoDateRestrictions(contratoField);
           }
         }
         checkNextBtn();
@@ -2138,7 +2263,7 @@ updateMonthly();
 //               AMOUNT FORM (1-й блок: доход + срок + mensualidad)
 // -------------------------------------------------------------
 let amountFormIncome = 500;
-let amountFormMonthsVal = 3;
+let amountFormMonthsVal = 12;
 const INCOME_STEP = 500;
 const INCOME_MIN = 500;
 const INCOME_MAX = 5000;

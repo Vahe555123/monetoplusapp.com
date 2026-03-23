@@ -27,6 +27,11 @@
       httpError.status = response.status;
       httpError.url = url;
       httpError.text = text;
+      if (text && text.trim()) {
+        try {
+          httpError.data = JSON.parse(text);
+        } catch (_) {}
+      }
       throw httpError;
     }
 
