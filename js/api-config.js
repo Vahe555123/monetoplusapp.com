@@ -6,7 +6,7 @@
     window.location.href.includes("localhost") ||
     window.location.href.includes("127.0.0.1")
   ) {
-    // API_BASE = "http://localhost:3000";
+    API_BASE = "http://localhost:3000";
   }
 
   var WHATSAPP_BASE_URL = "https://wa.me/41772895081?text=";
