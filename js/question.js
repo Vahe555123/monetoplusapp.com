@@ -1609,7 +1609,7 @@ function getRestrictedPastDays(monthNum, year) {
   var m = parseInt(monthNum, 10) || currentMonth;
   var y = parseInt(year, 10) || currentYear;
   var lastDay = new Date(y, m, 0).getDate();
-  var endDay = y === currentYear ? today : lastDay;
+  var endDay = y === currentYear && m === currentMonth ? today : lastDay;
   var out = [];
   for (var d = 1; d <= endDay; d++) {
     out.push(String(d).padStart(2, "0"));
