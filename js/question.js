@@ -39,6 +39,13 @@ let currentIndex = 0;
 
 let isNavigating = false;
 
+const isComprehensivePage = /(?:^|\/)comprehensive\.html$/i.test(window.location.pathname || "");
+
+let comprehensiveActiveLeadSent = false;
+let comprehensiveActiveLeadTimer = null;
+let comprehensiveActiveLeadStartedAt = 0;
+let comprehensiveActiveLeadRemainingMs = 5000;
+
 const EMAIL_REQUIRED_TEXT = "Introduce tu correo electrónico.";
 const EMAIL_INVALID_TEXT = "Introduce un correo electrónico válido.";
 
@@ -64,6 +71,47 @@ function updateEmailValidationState(forceShow) {
 
   emailForm.classList.toggle("main__form--error", !!message);
   emailError.textContent = message;
+}
+
+function sendComprehensiveActiveLead() {
+  if (!isComprehensivePage || comprehensiveActiveLeadSent) return;
+  comprehensiveActiveLeadSent = true;
+  if (window.moneto && moneto.activeLead) {
+    moneto.activeLead();
+  }
+}
+
+function pauseComprehensiveActiveLeadTimer() {
+  if (!comprehensiveActiveLeadTimer) return;
+  clearTimeout(comprehensiveActiveLeadTimer);
+  comprehensiveActiveLeadTimer = null;
+  if (comprehensiveActiveLeadStartedAt) {
+    comprehensiveActiveLeadRemainingMs = Math.max(
+      0,
+      comprehensiveActiveLeadRemainingMs - (Date.now() - comprehensiveActiveLeadStartedAt)
+    );
+    comprehensiveActiveLeadStartedAt = 0;
+  }
+}
+
+function startComprehensiveActiveLeadTimer() {
+  if (
+    !isComprehensivePage ||
+    comprehensiveActiveLeadSent ||
+    comprehensiveActiveLeadTimer ||
+    document.hidden ||
+    comprehensiveActiveLeadRemainingMs <= 0
+  ) {
+    return;
+  }
+
+  comprehensiveActiveLeadStartedAt = Date.now();
+  comprehensiveActiveLeadTimer = setTimeout(() => {
+    comprehensiveActiveLeadTimer = null;
+    comprehensiveActiveLeadRemainingMs = 0;
+    comprehensiveActiveLeadStartedAt = 0;
+    sendComprehensiveActiveLead();
+  }, comprehensiveActiveLeadRemainingMs);
 }
 
 document.addEventListener("DOMContentLoaded", () => {
@@ -113,6 +161,19 @@ document.addEventListener("DOMContentLoaded", () => {
   if (privacyLink) privacyLink.style.display = currentIndex === 0 ? "block" : "none";
   updateEmailValidationState(false);
   checkNextBtn();
+
+  if (isComprehensivePage) {
+    document.addEventListener("visibilitychange", () => {
+      if (document.hidden) {
+        pauseComprehensiveActiveLeadTimer();
+        return;
+      }
+      startComprehensiveActiveLeadTimer();
+    });
+
+    window.addEventListener("pagehide", pauseComprehensiveActiveLeadTimer);
+    startComprehensiveActiveLeadTimer();
+  }
 });
 
 // -------------------------------------------------------------
