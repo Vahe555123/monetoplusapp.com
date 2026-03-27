@@ -423,7 +423,7 @@ jQuery(document).ready(function () {
       }
       return true;
     },
-    "DNI/NIE No válido."
+    "DNI/NIE no válido."
   );
 
     jQuery.validator.addMethod(

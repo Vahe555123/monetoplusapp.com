@@ -133,12 +133,28 @@ body {
   border: 1px solid #fa6c12;
 }
 
+.main__form.main__form--error {
+  border: 1px solid #d92d20;
+}
+
 .main__input {
   padding-block: 16px;
   border: none;
   width: 100%;
   outline: none;
   font-size: 14px;
+}
+
+.main__field-error {
+  display: block;
+  margin-top: 8px;
+  color: #d92d20;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.main__field-error:empty {
+  display: none;
 }
 
 .btn {

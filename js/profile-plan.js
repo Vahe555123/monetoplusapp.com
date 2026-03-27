@@ -58,6 +58,51 @@ document.addEventListener("DOMContentLoaded", function () {
   const finalImage = document.getElementById("finalImage");
   const progressPercent = document.getElementById("progressPercent");
 
+  let activeLeadSent = false;
+  let activeLeadTimer = null;
+  let activeLeadStartedAt = 0;
+  let activeLeadRemainingMs = 5000;
+
+  function sendActiveLead() {
+    if (activeLeadSent) return;
+    activeLeadSent = true;
+    if (window.moneto && moneto.activeLead) {
+      moneto.activeLead();
+    }
+  }
+
+  function pauseActiveLeadTimer() {
+    if (!activeLeadTimer) return;
+    clearTimeout(activeLeadTimer);
+    activeLeadTimer = null;
+    if (activeLeadStartedAt) {
+      activeLeadRemainingMs = Math.max(0, activeLeadRemainingMs - (Date.now() - activeLeadStartedAt));
+      activeLeadStartedAt = 0;
+    }
+  }
+
+  function startActiveLeadTimer() {
+    if (activeLeadSent || activeLeadTimer || document.hidden || activeLeadRemainingMs <= 0) return;
+    activeLeadStartedAt = Date.now();
+    activeLeadTimer = setTimeout(() => {
+      activeLeadTimer = null;
+      activeLeadRemainingMs = 0;
+      activeLeadStartedAt = 0;
+      sendActiveLead();
+    }, activeLeadRemainingMs);
+  }
+
+  document.addEventListener("visibilitychange", function () {
+    if (document.hidden) {
+      pauseActiveLeadTimer();
+      return;
+    }
+    startActiveLeadTimer();
+  });
+
+  window.addEventListener("pagehide", pauseActiveLeadTimer);
+  startActiveLeadTimer();
+
   // ================= CONFIG =================
   let isDrawing = false;
   let brushRadius = 36;
@@ -296,14 +341,12 @@ document.addEventListener("DOMContentLoaded", function () {
       // status true = bot — продолжаем опрос на profile-plan, comprehensive только после TG
       if (data.status === true && data.accessToken) {
         localStorage.setItem("url", "profile-plan.html");
-        if (window.moneto && moneto.activeLead) moneto.activeLead();
+        sendActiveLead();
         return;
       }
       if (!data.status) {
         localStorage.setItem("scratchHumanAllowed", "1");
-        if (window.moneto && moneto.activeLead) {
-          moneto.activeLead();
-        }
+        sendActiveLead();
       }
       // location.href = "../final.html"
       return;

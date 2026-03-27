@@ -4,6 +4,8 @@
 const firstBlock = document.querySelector(".main__content");
 const emailInput = document.getElementById("emailInput");
 const phoneInput = document.getElementById("phoneInput");
+const emailForm = emailInput?.closest(".main__form");
+const emailError = document.getElementById("emailError");
 
 // Amount form (1-й блок)
 const amountForm = document.querySelector(".amount-form");
@@ -36,6 +38,33 @@ const privacyLink = document.querySelector(".privacy-link");
 let currentIndex = 0;
 
 let isNavigating = false;
+
+const EMAIL_REQUIRED_TEXT = "Introduce tu correo electrónico.";
+const EMAIL_INVALID_TEXT = "Introduce un correo electrónico válido.";
+
+function isEmailValid(value) {
+  const email = String(value || "").trim();
+  if (!email) return false;
+  return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email);
+}
+
+function updateEmailValidationState(forceShow) {
+  if (!emailInput || !emailForm || !emailError) return;
+
+  const value = emailInput.value.trim();
+  let message = "";
+
+  if (forceShow || value) {
+    if (!value) {
+      message = EMAIL_REQUIRED_TEXT;
+    } else if (!isEmailValid(value)) {
+      message = EMAIL_INVALID_TEXT;
+    }
+  }
+
+  emailForm.classList.toggle("main__form--error", !!message);
+  emailError.textContent = message;
+}
 
 document.addEventListener("DOMContentLoaded", () => {
   localStorage.setItem("lastPage", window.location.pathname);
@@ -82,6 +111,7 @@ document.addEventListener("DOMContentLoaded", () => {
   if (footerBtn) footerBtn.textContent = currentIndex === mainContents.length - 1 ? "¡Continuar!" : "Continuar";
   if (footerBtn2) footerBtn2.style.display = currentIndex === mainContents.length - 4 ? "block" : "none";
   if (privacyLink) privacyLink.style.display = currentIndex === 0 ? "block" : "none";
+  updateEmailValidationState(false);
   checkNextBtn();
 });
 
@@ -119,14 +149,14 @@ function checkNextBtn() {
       valid = true;
     } else {
       // Проверка email
-      const emailFilled = emailInput?.value.trim() !== "";
+      const emailValid = isEmailValid(emailInput?.value);
 
       // Проверка телефона (ровно 9 цифр после +34 )
       const PHONE_PREFIX = "+34 ";
       const phoneRaw = phoneInput?.value.replace(PHONE_PREFIX, "") || "";
       const phoneValid = phoneRaw.length === 9;
 
-      valid = emailFilled && phoneValid;
+      valid = emailValid && phoneValid;
     }
 
   } else if (block.querySelector(".credit-form")) {
@@ -210,14 +240,19 @@ function showNextContent() {
   }
 
   // Проверка email
-  const emailFilled = emailInput?.value.trim() !== "";
+  const emailValid = isEmailValid(emailInput?.value);
 
   // Проверка телефона (ровно 9 цифр после +34 )
   const PHONE_PREFIX = "+34 ";
   const phoneRaw = phoneInput?.value.replace(PHONE_PREFIX, "") || "";
   const phoneValid = phoneRaw.length === 9;
 
-  if (!emailFilled || !phoneValid) return;
+  if (!emailValid || !phoneValid) {
+    updateEmailValidationState(true);
+    return;
+  }
+
+  updateEmailValidationState(false);
 
   // сохраняем
   localStorage.setItem("inputName", emailInput?.value.trim());
@@ -1376,7 +1411,7 @@ function showCreditFormErrors(form) {
       if (err) {
         err.style.display = "block";
         if (input?.hasAttribute("data-postal-input")) err.textContent = "El código postal es incorrecto (5 dígitos)";
-        else if (input?.hasAttribute("data-dni-input") || input?.name === "dni-nie") err.textContent = "8 dígitos + 1 letra, sin espacios ni guiones";
+          else if (input?.hasAttribute("data-dni-input") || input?.name === "dni-nie") err.textContent = "DNI/NIE no válido";
         else err.textContent = "Campo obligatorio";
       }
     }
@@ -2076,7 +2111,7 @@ yearLists.forEach((yearList) => {
         if (err) {
           err.style.display = filled ? "none" : "block";
           if (!filled && inp.hasAttribute("data-postal-input")) err.textContent = "El código postal es incorrecto (5 dígitos)";
-          if (!filled && inp.hasAttribute("data-dni-input")) err.textContent = "8 dígitos + 1 letra, sin espacios ni guiones";
+          if (!filled && inp.hasAttribute("data-dni-input")) err.textContent = "DNI/NIE no válido";
         }
       }
       checkNextBtn();
@@ -2323,7 +2358,14 @@ if (amountForm) {
 const PHONE_PREFIX = "+34 ";
 
 // Email listener
-emailInput?.addEventListener("input", checkNextBtn);
+emailInput?.addEventListener("input", function () {
+  updateEmailValidationState(this.value.trim() !== "");
+  checkNextBtn();
+});
+
+emailInput?.addEventListener("blur", function () {
+  updateEmailValidationState(true);
+});
 
 // При фокусе вставляем +34
 phoneInput?.addEventListener("focus", function () {

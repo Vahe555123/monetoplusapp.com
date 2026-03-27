@@ -38,7 +38,7 @@ document.addEventListener("DOMContentLoaded", () => {
     let valid = true;
 
     if (!emailReg.test(email)) {
-      emailError.textContent = "Correo electrónico no válido";
+      emailError.textContent = "Introduce un correo electrónico válido.";
       valid = false;
     } else {
       emailError.textContent = "";
