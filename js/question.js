@@ -1958,6 +1958,88 @@ function syncContratoDateRestrictions(dateField) {
   }
 }
 
+function syncContratoDateRestrictionsActive(dateField) {
+  if (!dateField) return;
+
+  var yearEl = dateField.querySelector("[data-dropdown='contrato-year'] .credit-form__value");
+  var monthEl = dateField.querySelector("[data-dropdown='contrato-month'] .credit-form__value");
+  var dayEl = dateField.querySelector("[data-dropdown='contrato-day'] .credit-form__value");
+  if (!yearEl || !monthEl || !dayEl) return;
+
+  var yearVal = yearEl.getAttribute("data-value") || yearEl.textContent || "";
+  var monthVal = monthEl.getAttribute("data-value") || monthEl.textContent || "";
+  var dayVal = dayEl.getAttribute("data-value") || dayEl.textContent || "";
+
+  var yearList = dateField.querySelector(".credit-form__date-list-wrap[data-date-list='contrato-year'] .credit-form__dropdown-list");
+  var allowedYears = Array.from(yearList.querySelectorAll(".credit-form__dropdown-option"))
+    .map(function (opt) { return String(opt.getAttribute("data-value") || ""); })
+    .filter(Boolean);
+  filterDropdownOptionsByValues(yearList, allowedYears);
+
+  if (yearEl.getAttribute("data-empty") !== "true" && allowedYears.indexOf(yearVal) === -1) {
+    resetDateDropdownSelection(dateField, "contrato", "year", "AГ±o");
+    resetDateDropdownSelection(dateField, "contrato", "month", "Mes");
+    resetDateDropdownSelection(dateField, "contrato", "day", "Dia");
+    yearVal = "";
+    monthVal = "";
+    dayVal = "";
+  }
+
+  var now = new Date();
+  var currentYear = now.getFullYear();
+  var currentMonth = now.getMonth() + 1;
+  var currentDay = now.getDate();
+  var selectedYear = yearEl.getAttribute("data-empty") !== "true" ? parseInt(yearVal, 10) : null;
+
+  var monthList = dateField.querySelector(".credit-form__date-list-wrap[data-date-list='contrato-month'] .credit-form__dropdown-list");
+  var allMonths = Array.from(monthList.querySelectorAll(".credit-form__dropdown-option"))
+    .map(function (opt) { return String(opt.getAttribute("data-value") || ""); })
+    .filter(Boolean);
+  var allowedMonths = allMonths;
+
+  if (Number.isFinite(selectedYear) && selectedYear === currentYear) {
+    allowedMonths = allMonths.filter(function (value) {
+      return parseInt(value, 10) <= currentMonth;
+    });
+  }
+
+  filterDropdownOptionsByValues(monthList, allowedMonths);
+
+  if (monthEl.getAttribute("data-empty") !== "true" && allowedMonths.indexOf(monthVal) === -1) {
+    resetDateDropdownSelection(dateField, "contrato", "month", "Mes");
+    resetDateDropdownSelection(dateField, "contrato", "day", "Dia");
+    monthVal = "";
+    dayVal = "";
+  }
+
+  var dayList = dateField.querySelector(".credit-form__date-list-wrap[data-date-list='contrato-day'] .credit-form__dropdown-list");
+  var allDays = Array.from(dayList.querySelectorAll(".credit-form__dropdown-option"))
+    .map(function (opt) { return String(opt.getAttribute("data-value") || ""); })
+    .filter(Boolean);
+  var selectedMonth = monthEl.getAttribute("data-empty") !== "true" ? parseInt(monthVal, 10) : null;
+  var allowedDays = allDays;
+
+  if (Number.isFinite(selectedMonth)) {
+    var effectiveYear = Number.isFinite(selectedYear) ? selectedYear : currentYear;
+    var lastDay = new Date(effectiveYear, selectedMonth, 0).getDate();
+    var maxAllowedDay =
+      effectiveYear === currentYear && selectedMonth === currentMonth
+        ? currentDay
+        : lastDay;
+
+    allowedDays = [];
+    for (var day = maxAllowedDay; day >= 1; day--) {
+      allowedDays.push(String(day).padStart(2, "0"));
+    }
+  }
+
+  filterDropdownOptionsByValues(dayList, allowedDays);
+
+  if (dayEl.getAttribute("data-empty") !== "true" && allowedDays.indexOf(dayVal) === -1) {
+    resetDateDropdownSelection(dateField, "contrato", "day", "Dia");
+  }
+}
+
 function syncNominaDateRestrictions(dateField) {
   if (!dateField) return;
 
@@ -2158,7 +2240,7 @@ yearLists.forEach((yearList) => {
   });
   document.querySelectorAll(".credit-form__field[data-required-date]").forEach((field) => {
     if (field.querySelector("[data-dropdown='contrato-day']")) {
-      syncContratoDateRestrictions(field);
+      syncContratoDateRestrictionsActive(field);
     }
     if (field.querySelector("[data-dropdown='nomina-day']")) {
       syncNominaDateRestrictions(field);
@@ -2196,7 +2278,7 @@ yearLists.forEach((yearList) => {
           dateField &&
           (dayDropdown === "contrato-day" || dayDropdown === "contrato-month" || dayDropdown === "contrato-year")
         ) {
-          syncContratoDateRestrictions(dateField);
+          syncContratoDateRestrictionsActive(dateField);
         } else if (
           dateField &&
           (dayDropdown === "fin-day" || dayDropdown === "fin-month" || dayDropdown === "fin-year")
@@ -2383,7 +2465,7 @@ yearLists.forEach((yearList) => {
         if (ddName === "contrato-month" || ddName === "contrato-year") {
           var contratoField = dd.closest("[data-required-date]");
           if (contratoField) {
-            syncContratoDateRestrictions(contratoField);
+            syncContratoDateRestrictionsActive(contratoField);
           }
         }
         if (ddName === "fin-month" || ddName === "fin-year") {
