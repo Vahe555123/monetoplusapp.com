@@ -1328,6 +1328,9 @@ function getContractEndMonthOptions(year) {
 function getContractEndDayOptions(monthNum, year) {
   var allowedYears = getContractEndYearOptions();
   if (!allowedYears.length) return [];
+  if (!monthNum) return Array.from({ length: 31 }, function (_, i) {
+    return String(i + 1).padStart(2, "0");
+  });
 
   var effectiveYear = String(year || allowedYears[0]);
   var availableMonths = getContractEndMonthOptions(effectiveYear);
@@ -1364,6 +1367,9 @@ function getNominaDayOptions(monthNum, year) {
   var allowedMonths = getNominaMonthOptions().map(function (m) { return m.value; });
   if (!allowedMonths.length) return [];
   if (effectiveYear !== currentYear) return [];
+  if (!monthNum) return Array.from({ length: 31 }, function (_, i) {
+    return String(i + 1).padStart(2, "0");
+  });
 
   var parsedMonth = parseInt(monthNum, 10);
   var effectiveMonth = Number.isFinite(parsedMonth)
@@ -1991,7 +1997,7 @@ function syncNominaDateRestrictions(dateField) {
   }
 
   var dayList = dateField.querySelector(".credit-form__date-list-wrap[data-date-list='nomina-day'] .credit-form__dropdown-list");
-  var effectiveMonthVal = monthEl.getAttribute("data-empty") !== "true" ? monthVal : (allowedMonths[0] || "");
+  var effectiveMonthVal = monthEl.getAttribute("data-empty") !== "true" ? monthVal : "";
   var allowedDays = getNominaDays(effectiveMonthVal, effectiveYearVal);
   filterDropdownOptionsByValues(dayList, allowedDays);
 
@@ -2039,7 +2045,7 @@ function syncFechaFinDateRestrictions(dateField) {
   }
 
   var dayList = dateField.querySelector(".credit-form__date-list-wrap[data-date-list='fin-day'] .credit-form__dropdown-list");
-  var effectiveMonthVal = monthEl.getAttribute("data-empty") !== "true" ? monthVal : (allowedMonths[0] || "");
+  var effectiveMonthVal = monthEl.getAttribute("data-empty") !== "true" ? monthVal : "";
   var allowedDays = getContractEndDayOptions(effectiveMonthVal, effectiveYearVal);
   filterDropdownOptionsByValues(dayList, allowedDays);
 
@@ -2358,12 +2364,12 @@ yearLists.forEach((yearList) => {
           if (df) {
             var dayList = df.querySelector(".credit-form__date-list-wrap[data-date-list='nomina-day'] .credit-form__dropdown-list");
             if (dayList) {
-              populateRestrictedFutureDays(dayList, df, "nomina");
+              syncNominaDateRestrictions(df);
               var dayValEl = df.querySelector("[data-dropdown='nomina-day'] .credit-form__value");
               var dayVal = dayValEl?.getAttribute("data-value");
               var monthVal = df.querySelector("[data-dropdown='nomina-month'] .credit-form__value")?.getAttribute("data-value");
               var yearVal = df.querySelector("[data-dropdown='nomina-year'] .credit-form__value")?.getAttribute("data-value");
-              var days = getRestrictedFutureDays(monthVal, yearVal, true);
+              var days = getNominaDays(monthVal, yearVal);
               if (dayVal && days.indexOf(dayVal) === -1) {
                 if (dayValEl) {
                   dayValEl.textContent = "Día";
