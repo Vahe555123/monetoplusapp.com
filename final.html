@@ -9,6 +9,7 @@
 
     <title>Dynamic UI</title>
     <script src="./js/api-config.js?v=20260321-6"></script>
+    <script src="./js/flow-session-id.js?v=20260320-3"></script>
   </head>
 
   <body>
@@ -161,12 +162,12 @@
         var continueBtn = document.getElementById("continueBtn");
         if (continueBtn) {
           var jobId = localStorage.getItem("lastJobId") || "";
-          // Mientras el bot procesa (~3 min), el botón abre WhatsApp con el ID de solicitud
+          // Mientras el bot procesa (~3 min), el botón abre WhatsApp con el Session ID
           var waBase =
-            (window.WHATSAPP_BASE_URL || "") +
-            encodeURIComponent(
-              "Hola, ya hay resultado de mi solicitud? ID " + (jobId || "-")
-            );
+            typeof window.buildWhatsAppUrl === "function"
+              ? window.buildWhatsAppUrl("Hola, ya hay resultado de mi solicitud?")
+              : (window.WHATSAPP_BASE_URL || "") +
+                encodeURIComponent("Hola, ya hay resultado de mi solicitud?");
           var resultadosUrl = null;
           var pollTimer = null;
 
@@ -240,7 +241,10 @@
           notificationIcon.addEventListener("click", function () {
             var supportBase = window.WHATSAPP_BASE_URL || "";
             if (supportBase) {
-              window.location.href = supportBase + encodeURIComponent("Hola");
+              window.location.href =
+                typeof window.buildWhatsAppUrl === "function"
+                  ? window.buildWhatsAppUrl("Hola, necesito ayuda.")
+                  : supportBase + encodeURIComponent("Hola, necesito ayuda.");
             }
           });
         }

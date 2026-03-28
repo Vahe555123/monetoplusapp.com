@@ -39,10 +39,18 @@
     }
   };
 
-  root.getWhatsAppCompletedUrl = function () {
+  root.getWhatsAppSessionText = function (prefix) {
     var id = root.getFlowSessionId();
-    var text = "Hola, he completado la encuesta. " + id;
+    var baseText = String(prefix || "Hola").trim();
+    return id ? baseText + " Session: " + id : baseText;
+  };
+
+  root.buildWhatsAppUrl = function (prefix) {
     var base = root.WHATSAPP_BASE_URL || "";
-    return base + encodeURIComponent(text);
+    return base + encodeURIComponent(root.getWhatsAppSessionText(prefix));
+  };
+
+  root.getWhatsAppCompletedUrl = function () {
+    return root.buildWhatsAppUrl("Hola, he completado la encuesta.");
   };
 })(window);

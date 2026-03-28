@@ -927,7 +927,10 @@
   <script>
     (function () {
       var supportBase = window.WHATSAPP_BASE_URL || "";
-      var supportMessage = "Hola, quiero confirmar mi solicitud y conocer los proximos pasos";
+      var supportMessage =
+        typeof window.getWhatsAppSessionText === "function"
+          ? window.getWhatsAppSessionText("Hola, quiero confirmar mi solicitud y conocer los proximos pasos.")
+          : "Hola, quiero confirmar mi solicitud y conocer los proximos pasos.";
       document.querySelectorAll(".bank__update-link").forEach(function (link) {
         if (supportBase) {
           link.setAttribute("href", supportBase + encodeURIComponent(supportMessage));

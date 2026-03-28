@@ -3,6 +3,7 @@
  * Only shown when hostname is localhost.
  */
 (function () {
+  return
   // if (!/localhost|127\.0\.0\.1/i.test(window.location.hostname || "")) return;
 
   var DATA = {
