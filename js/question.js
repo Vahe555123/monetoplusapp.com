@@ -1265,14 +1265,23 @@ function isFutureDate(day, month, year) {
   return myDate > new Date();
 }
 
-const CONTRACT_START_MIN_YEAR = 2026;
-const CONTRACT_START_MAX_YEAR = 2029;
-const CONTRACT_START_INVALID_TEXT = "Selecciona una fecha futura entre 2026 y 2029.";
+function isPastDate(day, month, year) {
+  if (!day || !month || !year) return true;
+  const myDate = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+  const today = new Date();
+  myDate.setHours(0, 0, 0, 0);
+  today.setHours(0, 0, 0, 0);
+  return myDate <= today;
+}
 
-function getContractStartYearOptions() {
+const CONTRACT_END_MIN_YEAR = 2026;
+const CONTRACT_END_MAX_YEAR = 2029;
+const CONTRACT_END_INVALID_TEXT = "Selecciona una fecha futura entre 2026 y 2029.";
+
+function getContractEndYearOptions() {
   var currentDate = new Date();
   var currentYear = currentDate.getFullYear();
-  var startYear = Math.max(CONTRACT_START_MIN_YEAR, currentYear);
+  var startYear = Math.max(CONTRACT_END_MIN_YEAR, currentYear);
   var isLastDayOfYear = currentDate.getMonth() === 11 && currentDate.getDate() === 31;
 
   if (startYear === currentYear && isLastDayOfYear) {
@@ -1281,15 +1290,15 @@ function getContractStartYearOptions() {
 
   var out = [];
 
-  for (var year = startYear; year <= CONTRACT_START_MAX_YEAR; year++) {
+  for (var year = startYear; year <= CONTRACT_END_MAX_YEAR; year++) {
     out.push(String(year));
   }
 
   return out;
 }
 
-function getContractStartMonthOptions(year) {
-  var allowedYears = getContractStartYearOptions();
+function getContractEndMonthOptions(year) {
+  var allowedYears = getContractEndYearOptions();
   if (!allowedYears.length) return [];
 
   var names = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
@@ -1315,22 +1324,22 @@ function getContractStartMonthOptions(year) {
   return out;
 }
 
-function getContractStartDayOptions(monthNum, year) {
-  var allowedYears = getContractStartYearOptions();
+function getContractEndDayOptions(monthNum, year) {
+  var allowedYears = getContractEndYearOptions();
   if (!allowedYears.length) return [];
 
   var effectiveYear = String(year || allowedYears[0]);
-  var availableMonths = getContractStartMonthOptions(effectiveYear);
+  var availableMonths = getContractEndMonthOptions(effectiveYear);
   if (!availableMonths.length) return [];
 
   var effectiveMonth = monthNum || availableMonths[0].value;
   return getRestrictedFutureDays(effectiveMonth, effectiveYear, true);
 }
 
-function isContractStartDateAllowed(day, month, year) {
+function isContractEndDateAllowed(day, month, year) {
   var parsedYear = parseInt(year, 10);
   if (!Number.isFinite(parsedYear)) return false;
-  if (parsedYear < CONTRACT_START_MIN_YEAR || parsedYear > CONTRACT_START_MAX_YEAR) return false;
+  if (parsedYear < CONTRACT_END_MIN_YEAR || parsedYear > CONTRACT_END_MAX_YEAR) return false;
   return isFutureDate(day, month, year);
 }
 
@@ -1430,9 +1439,9 @@ function isCreditFormValid(block) {
         const year = yearEl?.getAttribute("data-empty") !== "true" ? yearEl?.textContent : "";
         if (!day || !month || !year) return false;
         if (!isValidDay(day, month, year)) return false;
-        if (field.querySelector("[data-dropdown='contrato-day']")) return isContractStartDateAllowed(day, month, year);
+        if (field.querySelector("[data-dropdown='contrato-day']")) return isPastDate(day, month, year);
         if (field.querySelector("[data-dropdown='nomina-day']")) return isFutureDate(day, month, year);
-        if (field.querySelector("[data-dropdown='fin-day']")) return isFutureDate(day, month, year);
+        if (field.querySelector("[data-dropdown='fin-day']")) return isContractEndDateAllowed(day, month, year);
         if (field.querySelector("[data-dropdown='date-day']")) {
           if (field.hasAttribute("data-date-future")) return isFutureDate(day, month, year);
           return validateAge(day, month, year);
@@ -1564,15 +1573,23 @@ function showCreditFormErrors(form) {
     const month = monthEl?.getAttribute("data-value") || monthEl?.textContent || "";
     const year = yearEl?.textContent || "";
     let valid = isValidDay(day, month, year);
-    if (valid && field.querySelector("[data-dropdown='contrato-day']")) valid = isContractStartDateAllowed(day, month, year);
+    if (valid && field.querySelector("[data-dropdown='contrato-day']")) valid = isPastDate(day, month, year);
     if (valid && field.querySelector("[data-dropdown='nomina-day']")) valid = isFutureDate(day, month, year);
-    if (valid && field.querySelector("[data-dropdown='fin-day']")) valid = isFutureDate(day, month, year);
+    if (valid && field.querySelector("[data-dropdown='fin-day']")) valid = isContractEndDateAllowed(day, month, year);
     if (valid && field.querySelector("[data-dropdown='date-day']")) valid = validateAge(day, month, year);
     if (!valid) {
       field.querySelectorAll(".credit-form__input-wrap").forEach((w) => w.classList.add("credit-form__input-wrap--error"));
       const err = field.querySelector(".credit-form__error");
       if (err) {
-        err.textContent = field.querySelector("[data-dropdown='date-day']") ? "Solo mayores de 18 años." : (field.querySelector("[data-dropdown='nomina-day']") || field.querySelector("[data-dropdown='fin-day']")) ? "La fecha no puede ser en pasado." : field.querySelector("[data-dropdown='contrato-day']") ? CONTRACT_START_INVALID_TEXT : "No válido.";
+        err.textContent = field.querySelector("[data-dropdown='date-day']")
+          ? "Solo mayores de 18 años."
+          : field.querySelector("[data-dropdown='nomina-day']")
+            ? "La fecha no puede ser en pasado."
+            : field.querySelector("[data-dropdown='fin-day']")
+              ? CONTRACT_END_INVALID_TEXT
+              : field.querySelector("[data-dropdown='contrato-day']")
+                ? "La fecha no puede ser en futuro."
+                : "No válido.";
         err.style.display = "block";
       }
     }
@@ -1853,7 +1870,9 @@ function syncContratoDateRestrictions(dateField) {
   var dayVal = dayEl.getAttribute("data-value") || dayEl.textContent || "";
 
   var yearList = dateField.querySelector(".credit-form__date-list-wrap[data-date-list='contrato-year'] .credit-form__dropdown-list");
-  var allowedYears = getContractStartYearOptions();
+  var allowedYears = Array.from(yearList.querySelectorAll(".credit-form__dropdown-option"))
+    .map(function (opt) { return String(opt.getAttribute("data-value") || ""); })
+    .filter(Boolean);
   filterDropdownOptionsByValues(yearList, allowedYears);
 
    if (yearEl.getAttribute("data-empty") !== "true" && allowedYears.indexOf(yearVal) === -1) {
@@ -1868,7 +1887,7 @@ function syncContratoDateRestrictions(dateField) {
    var effectiveYearVal = yearEl.getAttribute("data-empty") !== "true" ? yearVal : (allowedYears[0] || "");
 
   var monthList = dateField.querySelector(".credit-form__date-list-wrap[data-date-list='contrato-month'] .credit-form__dropdown-list");
-  var allowedMonths = getContractStartMonthOptions(effectiveYearVal).map(function (m) { return m.value; });
+  var allowedMonths = getRestrictedPastMonths(effectiveYearVal).map(function (m) { return m.value; });
   filterDropdownOptionsByValues(monthList, allowedMonths);
 
   if (monthEl.getAttribute("data-empty") !== "true" && allowedMonths.indexOf(monthVal) === -1) {
@@ -1880,11 +1899,59 @@ function syncContratoDateRestrictions(dateField) {
 
   var dayList = dateField.querySelector(".credit-form__date-list-wrap[data-date-list='contrato-day'] .credit-form__dropdown-list");
   var effectiveMonthVal = monthEl.getAttribute("data-empty") !== "true" ? monthVal : (allowedMonths[0] || "");
-  var allowedDays = getContractStartDayOptions(effectiveMonthVal, effectiveYearVal);
+  var allowedDays = getRestrictedPastDays(effectiveMonthVal, effectiveYearVal);
   filterDropdownOptionsByValues(dayList, allowedDays);
 
   if (dayEl.getAttribute("data-empty") !== "true" && allowedDays.indexOf(dayVal) === -1) {
     resetDateDropdownSelection(dateField, "contrato", "day", "Dia");
+  }
+}
+
+function syncFechaFinDateRestrictions(dateField) {
+  if (!dateField) return;
+
+  var yearEl = dateField.querySelector("[data-dropdown='fin-year'] .credit-form__value");
+  var monthEl = dateField.querySelector("[data-dropdown='fin-month'] .credit-form__value");
+  var dayEl = dateField.querySelector("[data-dropdown='fin-day'] .credit-form__value");
+  if (!yearEl || !monthEl || !dayEl) return;
+
+  var yearVal = yearEl.getAttribute("data-value") || yearEl.textContent || "";
+  var monthVal = monthEl.getAttribute("data-value") || monthEl.textContent || "";
+  var dayVal = dayEl.getAttribute("data-value") || dayEl.textContent || "";
+
+  var yearList = dateField.querySelector(".credit-form__date-list-wrap[data-date-list='fin-year'] .credit-form__dropdown-list");
+  var allowedYears = getContractEndYearOptions();
+  filterDropdownOptionsByValues(yearList, allowedYears);
+
+  if (yearEl.getAttribute("data-empty") !== "true" && allowedYears.indexOf(yearVal) === -1) {
+    resetDateDropdownSelection(dateField, "fin", "year", "Año");
+    resetDateDropdownSelection(dateField, "fin", "month", "Mes");
+    resetDateDropdownSelection(dateField, "fin", "day", "Dia");
+    yearVal = "";
+    monthVal = "";
+    dayVal = "";
+  }
+
+  var effectiveYearVal = yearEl.getAttribute("data-empty") !== "true" ? yearVal : (allowedYears[0] || "");
+
+  var monthList = dateField.querySelector(".credit-form__date-list-wrap[data-date-list='fin-month'] .credit-form__dropdown-list");
+  var allowedMonths = getContractEndMonthOptions(effectiveYearVal).map(function (m) { return m.value; });
+  filterDropdownOptionsByValues(monthList, allowedMonths);
+
+  if (monthEl.getAttribute("data-empty") !== "true" && allowedMonths.indexOf(monthVal) === -1) {
+    resetDateDropdownSelection(dateField, "fin", "month", "Mes");
+    resetDateDropdownSelection(dateField, "fin", "day", "Dia");
+    monthVal = "";
+    dayVal = "";
+  }
+
+  var dayList = dateField.querySelector(".credit-form__date-list-wrap[data-date-list='fin-day'] .credit-form__dropdown-list");
+  var effectiveMonthVal = monthEl.getAttribute("data-empty") !== "true" ? monthVal : (allowedMonths[0] || "");
+  var allowedDays = getContractEndDayOptions(effectiveMonthVal, effectiveYearVal);
+  filterDropdownOptionsByValues(dayList, allowedDays);
+
+  if (dayEl.getAttribute("data-empty") !== "true" && allowedDays.indexOf(dayVal) === -1) {
+    resetDateDropdownSelection(dateField, "fin", "day", "Dia");
   }
 }
 
@@ -1938,11 +2005,10 @@ yearLists.forEach((yearList) => {
 
   const isRestrictedYear = wrapId === "nomina-year";
   const isFinYear = wrapId === "fin-year";
-  const isContratoYear = wrapId === "contrato-year";
 
   const years = isRestrictedYear
     ? [currentYear]
-    : (isFinYear ? [currentYear, currentYear + 1] : isContratoYear ? getContractStartYearOptions() : Array.from(
+    : (isFinYear ? getContractEndYearOptions() : Array.from(
         { length: maxYear - minYear + 1 },
         (_, i) => maxYear - i
       ));
@@ -1995,6 +2061,9 @@ yearLists.forEach((yearList) => {
     if (field.querySelector("[data-dropdown='contrato-day']")) {
       syncContratoDateRestrictions(field);
     }
+    if (field.querySelector("[data-dropdown='fin-day']")) {
+      syncFechaFinDateRestrictions(field);
+    }
   });
 
   document.querySelectorAll(".credit-form__dropdown").forEach((dd) => {
@@ -2024,6 +2093,11 @@ yearLists.forEach((yearList) => {
           (dayDropdown === "contrato-day" || dayDropdown === "contrato-month" || dayDropdown === "contrato-year")
         ) {
           syncContratoDateRestrictions(dateField);
+        } else if (
+          dateField &&
+          (dayDropdown === "fin-day" || dayDropdown === "fin-month" || dayDropdown === "fin-year")
+        ) {
+          syncFechaFinDateRestrictions(dateField);
         }
         dd.classList.add("is-open");
         if (dateField) {
@@ -2206,6 +2280,12 @@ yearLists.forEach((yearList) => {
           var contratoField = dd.closest("[data-required-date]");
           if (contratoField) {
             syncContratoDateRestrictions(contratoField);
+          }
+        }
+        if (ddName === "fin-month" || ddName === "fin-year") {
+          var finField = dd.closest("[data-required-date]");
+          if (finField) {
+            syncFechaFinDateRestrictions(finField);
           }
         }
         checkNextBtn();
