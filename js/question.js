@@ -40,14 +40,49 @@ let currentIndex = 0;
 let isNavigating = false;
 
 const isComprehensivePage = /(?:^|\/)comprehensive\.html$/i.test(window.location.pathname || "");
+const COMPREHENSIVE_COMPLETED_STORAGE_KEY = "comprehensiveFormCompleted";
+const COMPREHENSIVE_FINAL_REDIRECT_URL = "./final.html";
 
 let comprehensiveActiveLeadSent = false;
 let comprehensiveActiveLeadTimer = null;
 let comprehensiveActiveLeadStartedAt = 0;
 let comprehensiveActiveLeadRemainingMs = 5000;
+let comprehensiveCompletionGuardTimer = null;
+let comprehensiveCompletionRedirectStarted = false;
 
 const EMAIL_REQUIRED_TEXT = "Introduce tu correo electrónico.";
 const EMAIL_INVALID_TEXT = "Introduce un correo electrónico válido.";
+
+function hasComprehensiveCompletionLock() {
+  try {
+    return localStorage.getItem(COMPREHENSIVE_COMPLETED_STORAGE_KEY) === "1";
+  } catch (_) {
+    return false;
+  }
+}
+
+function markComprehensiveAsCompleted() {
+  try {
+    localStorage.setItem(COMPREHENSIVE_COMPLETED_STORAGE_KEY, "1");
+  } catch (_) {}
+}
+
+function redirectCompletedComprehensiveToFinal() {
+  if (!isComprehensivePage || !hasComprehensiveCompletionLock()) return false;
+  if (comprehensiveCompletionRedirectStarted) return true;
+
+  comprehensiveCompletionRedirectStarted = true;
+  window.location.replace(COMPREHENSIVE_FINAL_REDIRECT_URL);
+  return true;
+}
+
+function startComprehensiveCompletionGuard() {
+  if (!isComprehensivePage || comprehensiveCompletionGuardTimer) return;
+
+  comprehensiveCompletionGuardTimer = setInterval(() => {
+    redirectCompletedComprehensiveToFinal();
+  }, 1000);
+}
 
 function isEmailValid(value) {
   const email = String(value || "").trim();
@@ -115,6 +150,12 @@ function startComprehensiveActiveLeadTimer() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+  if (isComprehensivePage) {
+    if (redirectCompletedComprehensiveToFinal()) return;
+    startComprehensiveCompletionGuard();
+    window.addEventListener("pageshow", redirectCompletedComprehensiveToFinal);
+  }
+
   localStorage.setItem("lastPage", window.location.pathname);
 
   // Restore email/phone from localStorage into inputs
@@ -632,13 +673,6 @@ async function verifyScratchOnServer() {
     flowSessionId: typeof window.getFlowSessionId === "function" ? window.getFlowSessionId() : null,
     clearedPercent: Math.round(scratchClearedPercent || 0),
     pointerEvents: { hasPointerDown, hasPointerMove },
-    time: {
-      totalTime:
-        scratchStartTime && scratchEndTime
-          ? Math.round(scratchEndTime - scratchStartTime)
-          : null
-    },
-    distance: { totalPathLength: Math.round(totalPathLength || 0) },
     bbox: { bboxWidth: Math.round(bboxWidth), bboxHeight: Math.round(bboxHeight) },
     canvas: {
       canvasWidth: Math.round(scratchCanvas.width),
@@ -1115,7 +1149,7 @@ async function doSendJobToApi() {
   var url = apiBase + "/api/jobs";
   console.log("[doSendJobToApi] fetch URL:", url);
   // После отправки comprehensive-формы на сервер — всегда final.html (страница благодарности/итог)
-  var redirectUrl = "./final.html";
+  var redirectUrl = COMPREHENSIVE_FINAL_REDIRECT_URL;
   try {
     var result = window.fetchJsonWithApiFallback
       ? await window.fetchJsonWithApiFallback(
@@ -1141,13 +1175,16 @@ async function doSendJobToApi() {
     var data = result.data;
     console.log("[doSendJobToApi] fetch success, status:", res.status);
     if (res.ok) {
+      if (isComprehensivePage) {
+        markComprehensiveAsCompleted();
+      }
       if (data && data.jobId) {
         localStorage.setItem("lastJobId", data.jobId);
       }
       if (window.FlowEvents) FlowEvents.flowCompleted(allAnswers);
       if (window.FlowState) FlowState.clear();
       clearComprehensiveAnswers();
-      window.location.href = redirectUrl;
+      window.location.replace(redirectUrl);
       return;
     }
     console.error("[doSendJobToApi] server error:", res.status, data);
@@ -1396,11 +1433,32 @@ function isIbanValid(val) {
 }
 
 /** DNI/NIE: solo letras (inglés) y dígitos, 9 caracteres, sin espacios/guiones, último — letra */
+function fallbackIsValidDniNie(val) {
+  var normalized = String(val || "")
+    .replace(/[\s\-]/g, "")
+    .toUpperCase();
+  var letters = "TRWAGMYFPDXBNJZSQVHLCKE";
+  var dniMatch = /^(\d{8})([A-Z])$/.exec(normalized);
+
+  if (dniMatch) {
+    var dniNumber = parseInt(dniMatch[1], 10);
+    return letters.charAt(dniNumber % 23) === dniMatch[2];
+  }
+
+  var nieMatch = /^([XYZ])(\d{7,8})([A-Z])$/.exec(normalized);
+  if (!nieMatch) return false;
+
+  var prefixMap = { X: "0", Y: "1", Z: "2" };
+  var nieNumber = parseInt(prefixMap[nieMatch[1]] + nieMatch[2], 10);
+  return letters.charAt(nieNumber % 23) === nieMatch[3];
+}
+
 function isDniNieValid(val) {
-  var s = (val || "").replace(/[\s\-]/g, "");
-  if (s.length !== 9) return false;
-  if (!/^[A-Za-z0-9]+$/.test(s)) return false;
-  return /[A-Za-z]/.test(s.charAt(8));
+  if (window.DniValidation && typeof window.DniValidation.isValidDniNie === "function") {
+    return window.DniValidation.isValidDniNie(val);
+  }
+
+  return fallbackIsValidDniNie(val);
 }
 
 const TIPO_HIDE_WORK = ["Ama de Casa", "Desempleado", "Estudiante"];

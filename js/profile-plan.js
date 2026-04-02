@@ -247,15 +247,6 @@ document.addEventListener("DOMContentLoaded", function () {
         hasPointerDown,
         hasPointerMove,
       },
-      time: {
-        totalTime:
-          scratchStartTime && scratchEndTime
-            ? Math.round(scratchEndTime - scratchStartTime)
-            : null,
-      },
-      distance: {
-        totalPathLength: Math.round(totalPathLength || 0),
-      },
       bbox: {
         bboxWidth: Math.round(bboxWidth),
         bboxHeight: Math.round(bboxHeight),
