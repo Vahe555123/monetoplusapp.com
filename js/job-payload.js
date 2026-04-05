@@ -281,6 +281,78 @@
     return arr[Math.floor(Math.random() * arr.length)];
   }
 
+  function getSalaryRulesApi() {
+    if (root.SalaryRules && typeof root.SalaryRules.applySalaryRules === "function") {
+      return root.SalaryRules;
+    }
+
+    return {
+      applySalaryRules: function (salario, monthlyLoan, mensualidad, otrosGastos, loanAmount) {
+        var currentSalary = parseInt(salario, 10) || 0;
+        if (currentSalary <= 0) {
+          return {
+            salary: currentSalary,
+            originalSalary: currentSalary,
+            minimumApplied: false,
+            budgetApplied: false,
+            minAdded: 0,
+            budgetAdded: 0,
+            totalAdded: 0,
+            budgetBefore: currentSalary,
+            budgetAfterMinimum: currentSalary
+          };
+        }
+
+        var loan = parseInt(monthlyLoan, 10) || 0;
+        var rent = parseInt(mensualidad, 10) || 0;
+        var other = parseInt(otrosGastos, 10) || 0;
+        var amount = parseInt(loanAmount, 10) || 0;
+        var salaryAfterMinimum = currentSalary;
+        var minAdded = 0;
+
+        if (salaryAfterMinimum < 1300) {
+          var salaryOptions = [];
+          for (var nextSalary = 1300; nextSalary <= 2000; nextSalary += 50) {
+            salaryOptions.push(nextSalary);
+          }
+          salaryAfterMinimum = salaryOptions[Math.floor(Math.random() * salaryOptions.length)];
+          minAdded = salaryAfterMinimum - currentSalary;
+        }
+
+        var budgetAfterMinimum = salaryAfterMinimum - (loan + rent + other);
+        if (budgetAfterMinimum >= 500) {
+          return {
+            salary: salaryAfterMinimum,
+            originalSalary: currentSalary,
+            minimumApplied: minAdded > 0,
+            budgetApplied: false,
+            minAdded: minAdded,
+            budgetAdded: 0,
+            totalAdded: minAdded,
+            budgetBefore: currentSalary - (loan + rent + other),
+            budgetAfterMinimum: budgetAfterMinimum
+          };
+        }
+
+        var budgetOptions = [400, 450, 500, 550, 600];
+        var targetBudget = amount + budgetOptions[Math.floor(Math.random() * budgetOptions.length)];
+        var salaryAfterBudget = Math.round((loan + rent + other + targetBudget) / 50) * 50;
+
+        return {
+          salary: salaryAfterBudget,
+          originalSalary: currentSalary,
+          minimumApplied: minAdded > 0,
+          budgetApplied: salaryAfterBudget !== salaryAfterMinimum,
+          minAdded: minAdded,
+          budgetAdded: salaryAfterBudget - salaryAfterMinimum,
+          totalAdded: salaryAfterBudget - currentSalary,
+          budgetBefore: currentSalary - (loan + rent + other),
+          budgetAfterMinimum: budgetAfterMinimum
+        };
+      }
+    };
+  }
+
   /** Случайная добавка 400–600: 400, 450, 500, 550, 600 */
   function randomBudgetExtra() {
     var options = [400, 450, 500, 550, 600];
@@ -359,10 +431,11 @@
     var mens = parseInt(getByKey(out, ["Mensualidad en Alquiler/Hipoteca", "mensualidad"]) || 0, 10);
     var otros = parseInt(getByKey(out, ["Otros gastos mensuales fijos", "otros-gastos"]) || 0, 10);
     if (salario > 0) {
-      var adj = adjustSalaryForBudget(salario, monthlyLoan, mens, otros, amount);
-      if (adj.added > 0) {
-        out["Salario Neto Mensual"] = String(adj.salary);
-        out["salario-neto"] = String(adj.salary);
+      var salaryRules = getSalaryRulesApi();
+      var salaryResult = salaryRules.applySalaryRules(salario, monthlyLoan, mens, otros, amount);
+      if (salaryResult && salaryResult.salary > 0 && salaryResult.salary !== salario) {
+        out["Salario Neto Mensual"] = String(salaryResult.salary);
+        out["salario-neto"] = String(salaryResult.salary);
       }
     }
     return out;
@@ -440,12 +513,40 @@
     var mensualidad = parseInt(getByKey(allAnswers, ["Mensualidad en Alquiler/Hipoteca", "mensualidad"]) || 0, 10);
     var otrosGastos = parseInt(getByKey(allAnswers, ["Otros gastos mensuales fijos", "otros-gastos"]) || 0, 10);
     var monthlyLoanPayment = months > 0 ? Math.round(amount / months) : 0;
-    var budgetBefore = salarioNeto - (monthlyLoanPayment + mensualidad + otrosGastos);
-    if (budgetBefore < 500 && salarioNeto > 0) {
-      var oldSal = salarioNeto;
-      var adj = adjustSalaryForBudget(salarioNeto, monthlyLoanPayment, mensualidad, otrosGastos, amount);
-      salarioNeto = adj.salary;
-      console.log("[buildJobPayloadFromForm] Budget<500: +" + adj.added + " to salary → " + salarioNeto + " (was " + oldSal + ", budget was " + budgetBefore + ")");
+    if (salarioNeto > 0) {
+      var salaryRules = getSalaryRulesApi();
+      var salaryResult = salaryRules.applySalaryRules(
+        salarioNeto,
+        monthlyLoanPayment,
+        mensualidad,
+        otrosGastos,
+        amount
+      );
+      if (salaryResult.minimumApplied) {
+        console.log(
+          "[buildJobPayloadFromForm] Salary<1300: +" +
+            salaryResult.minAdded +
+            " to salary → " +
+            (salaryResult.originalSalary + salaryResult.minAdded) +
+            " (was " +
+            salaryResult.originalSalary +
+            ")"
+        );
+      }
+      if (salaryResult.budgetApplied) {
+        console.log(
+          "[buildJobPayloadFromForm] Budget<500 after salary rules: +" +
+            salaryResult.budgetAdded +
+            " to salary → " +
+            salaryResult.salary +
+            " (budget before " +
+            salaryResult.budgetBefore +
+            ", after min rule " +
+            salaryResult.budgetAfterMinimum +
+            ")"
+        );
+      }
+      salarioNeto = salaryResult.salary;
     }
     var otrasFuentesRaw = getByKey(allAnswers, ["Otras Fuentes de Ingresos", "otras-fuentes"]);
     var razonOtrasFuentes = getByKey(allAnswers, ["razon-otras-fuentes", "Razón Otras Fuentes de Ingresos"]);

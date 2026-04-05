@@ -26,5 +26,8 @@ test("rejects malformed DNI values", () => {
 
 test("keeps NIE validation working with the same modulo-23 table", () => {
   assert.equal(isValidSpanishNie("X1234567L"), true);
+  assert.equal(isValidDniNie("Y7046137D"), true);
+  assert.equal(isValidDniNie("77794655F"), true);
+  assert.equal(isValidDniNie("16801009S"), true);
   assert.equal(isValidDniNie("X1234567A"), false);
 });
