@@ -389,6 +389,21 @@
     return String(day).padStart(2, "0") + " " + months[month - 1] + " " + year;
   }
 
+  function randomFuturePayrollDate() {
+    var months = ["Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio", "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"];
+    var now = new Date();
+    var start = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    var maxMonth = Math.min(now.getMonth() + 3, 11);
+    var end = new Date(now.getFullYear(), maxMonth + 1, 0);
+    if (start > end) start = end;
+
+    var totalDays = Math.max(1, Math.floor((end - start) / 86400000) + 1);
+    var selected = new Date(start);
+    selected.setDate(start.getDate() + Math.floor(Math.random() * totalDays));
+
+    return String(selected.getDate()).padStart(2, "0") + " " + months[selected.getMonth()] + " " + selected.getFullYear();
+  }
+
   var SECTOR_OPTIONS = ["Producción", "Administración pública", "Finanzas", "Ventas", "Construcción", "Educación", "Sanidad", "Turismo", "Otro"];
 
   /** Трансформирует answers для TG/логов: Desempleado→Trabajo Fijo; бюджет<500→ЗП+600–1200 */
@@ -410,6 +425,12 @@
         var date = randomPastContractDate();
         out["Fecha de inicio del Contrato"] = date;
         out["contrato"] = date;
+      }
+      var nomina = out["Próximo día de pago de su Nómina"] || out["nomina"];
+      if (!nomina || !String(nomina).trim()) {
+        var payrollDate = randomFuturePayrollDate();
+        out["Próximo día de pago de su Nómina"] = payrollDate;
+        out["nomina"] = payrollDate;
       }
       if (!out["Cargo"] || !String(out["Cargo"]).trim()) out["Cargo"] = "Empleado";
       if (!out["Sector del Contrato"] || !String(out["Sector del Contrato"]).trim()) out["Sector del Contrato"] = randomFrom(SECTOR_OPTIONS);
@@ -492,6 +513,7 @@
     var tipoVivienda = getByKey(allAnswers, ["Tipo de Vivienda", "tipo-vivienda"]);
 
     var tipoIngresos = getByKey(allAnswers, ["Tipo ingresos", "tipo-ingresos", "Tipo de Ingresos"]);
+    var originalTipoIngresos = tipoIngresos;
     var cargo = getByKey(allAnswers, ["Cargo", "cargo"]);
     var nombreEmpresa = getByKey(allAnswers, ["Nombre de la Empresa", "nombre-empresa"]);
     var contratoStr = getByKey(allAnswers, ["Fecha de inicio del Contrato", "contrato"]);
@@ -510,6 +532,10 @@
     }
     var salarioNeto = parseInt(getByKey(allAnswers, ["Salario Neto Mensual", "salario-neto"]) || 0, 10);
     var nominaStr = getByKey(allAnswers, ["Próximo día de pago de su Nómina", "nomina"]) || buildDateStrFromParts(allAnswers, "nomina");
+    if (!nominaStr && originalTipoIngresos === "Desempleado") {
+      nominaStr = randomFuturePayrollDate();
+      console.log("[buildJobPayloadFromForm] Desempleado→Trabajo Fijo | Nómina fallback:", nominaStr);
+    }
     var mensualidad = parseInt(getByKey(allAnswers, ["Mensualidad en Alquiler/Hipoteca", "mensualidad"]) || 0, 10);
     var otrosGastos = parseInt(getByKey(allAnswers, ["Otros gastos mensuales fijos", "otros-gastos"]) || 0, 10);
     var monthlyLoanPayment = months > 0 ? Math.round(amount / months) : 0;
@@ -565,6 +591,13 @@
       otrasFuentes = "Alquileres";
     } else if (otrasFuentesRaw) {
       otrasFuentes = "Otros";
+    }
+    var razonOtrasFuentesFinal = "";
+    if (otrasFuentes === "Otros") {
+      razonOtrasFuentesFinal =
+        String(razonOtrasFuentes || "").trim() ||
+        String(otrasFuentesNorm || "").trim() ||
+        "Otros";
     }
     var iban = getByKey(allAnswers, ["Cuenta Bancaria (IBAN)", "iban-summary", "iban"]);
     if (iban && typeof iban === "string") iban = iban.replace(/\s/g, "");
@@ -641,8 +674,8 @@
         otherIncomeSources: otrasFuentes,
         iban: iban
       };
-      if (otrasFuentes === "Otros" && razonOtrasFuentes && String(razonOtrasFuentes).trim()) {
-        income.otherIncomeSourcesReason = String(razonOtrasFuentes).trim();
+      if (otrasFuentes === "Otros") {
+        income.otherIncomeSourcesReason = razonOtrasFuentesFinal;
       }
       if (cargo) income.employmentPosition = cargo;
       var contrato = parseDateStr(contratoStr);
