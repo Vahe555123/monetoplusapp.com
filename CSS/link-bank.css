@@ -142,3 +142,68 @@ body {
     rgba(255, 119, 215, 1) 100%
   );
 }
+
+.waiting-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: none;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.waiting-modal--open {
+  display: flex;
+}
+
+.waiting-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 15, 15, 0.56);
+}
+
+.waiting-modal__dialog {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  max-width: 360px;
+  padding: 24px 20px 20px;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 18px 48px rgba(15, 15, 15, 0.18);
+  text-align: center;
+}
+
+.waiting-modal__title {
+  color: #0f0f0f;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.waiting-modal__text {
+  margin-top: 12px;
+  color: #0f0f0f;
+  font-size: 16px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+
+.waiting-modal__btn {
+  width: 100%;
+  margin-top: 22px;
+  padding: 16px 18px;
+  border: none;
+  border-radius: 14px;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 118, 31, 1) 0%,
+    rgba(255, 119, 215, 1) 100%
+  );
+  color: #fff;
+  font-family: "DM Sans", sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}

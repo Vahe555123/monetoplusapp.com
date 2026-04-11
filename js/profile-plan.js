@@ -281,6 +281,7 @@ document.addEventListener("DOMContentLoaded", function () {
 
       const res = verifyResult.response;
       const data = verifyResult.data !== null ? verifyResult.data : await res.json();
+      localStorage.removeItem("comprehensiveAddressGeoAutofillApplied");
       localStorage.setItem("scratchVerify", JSON.stringify(data));
       if (data.accessToken) localStorage.setItem("scratchAccessToken", data.accessToken);
       console.log(data);
@@ -371,6 +372,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 obj.status = false;
                 obj.url = "comprehensive.html";
                 delete obj.accessToken;
+                localStorage.removeItem("comprehensiveAddressGeoAutofillApplied");
                 localStorage.setItem("scratchVerify", JSON.stringify(obj));
               } catch (e) {}
             }

@@ -30,7 +30,7 @@
   }
 
   function shouldActivateGuard() {
-    if (isComprehensivePage) return true;
+    if (isComprehensivePage || isFinalPage) return true;
 
     try {
       return localStorage.getItem(COMPLETED_KEY) === "1" || !!localStorage.getItem("lastJobId");

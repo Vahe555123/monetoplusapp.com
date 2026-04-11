@@ -24,12 +24,12 @@ let currentAmount = 1000;
 
 const mainContents = [
   document.querySelector(".main__content"),
+  document.querySelector(".main__content-7"),
   document.querySelector(".main__content-2"),
   document.querySelector(".main__content-3"),
   document.querySelector(".main__content-4"),
   document.querySelector(".main__content-5"),
-  document.querySelector(".main__content-6"),
-  document.querySelector(".main__content-7")
+  document.querySelector(".main__content-6")
 ].filter(Boolean);
 
 const privacyLink = document.querySelector(".privacy-link");
@@ -42,6 +42,7 @@ let isNavigating = false;
 const isComprehensivePage = /(?:^|\/)comprehensive\.html$/i.test(window.location.pathname || "");
 const COMPREHENSIVE_COMPLETED_STORAGE_KEY = "comprehensiveFormCompleted";
 const COMPREHENSIVE_FINAL_REDIRECT_URL = "./final.html";
+const COMPREHENSIVE_ADDRESS_GEO_AUTOFILL_KEY = "comprehensiveAddressGeoAutofillApplied";
 
 let comprehensiveActiveLeadSent = false;
 let comprehensiveActiveLeadTimer = null;
@@ -172,6 +173,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // If navigating to comprehensive from another page — clear old answers so profile-plan data doesn't interfere
     if (prevPage && prevPage !== window.location.pathname && window.location.pathname.indexOf("comprehensive") >= 0) {
       FlowState.clear();
+      clearAddressGeoAutofillState();
     }
     var state = FlowState.init();
     if (prevPage === window.location.pathname && typeof state.currentStep === "number" && state.currentStep > 0) {
@@ -195,6 +197,7 @@ document.addEventListener("DOMContentLoaded", () => {
   mainContents.forEach((block, i) => {
     block.style.display = i === currentIndex ? "block" : "none";
   });
+  maybeApplyAddressGeoAutofill();
   updateProgress();
   if (header) header.style.display = "flex";
   if (footerBtn) footerBtn.textContent = currentIndex === mainContents.length - 1 ? "¡Continuar!" : "Continuar";
@@ -326,6 +329,93 @@ function getUserPhone() {
   return (localStorage.getItem("inputPhone") || "").trim();
 }
 
+function clearAddressGeoAutofillState() {
+  try {
+    localStorage.removeItem(COMPREHENSIVE_ADDRESS_GEO_AUTOFILL_KEY);
+  } catch (_) {}
+}
+
+function hasAddressGeoAutofillState() {
+  try {
+    return localStorage.getItem(COMPREHENSIVE_ADDRESS_GEO_AUTOFILL_KEY) === "1";
+  } catch (_) {
+    return false;
+  }
+}
+
+function markAddressGeoAutofillApplied() {
+  try {
+    localStorage.setItem(COMPREHENSIVE_ADDRESS_GEO_AUTOFILL_KEY, "1");
+  } catch (_) {}
+}
+
+function getScratchGeoForAddressPrefill() {
+  try {
+    var raw = localStorage.getItem("scratchVerify");
+    if (!raw) return null;
+
+    var parsed = JSON.parse(raw);
+    var geo = parsed && parsed.geo && typeof parsed.geo === "object" ? parsed.geo : null;
+    if (!geo) return null;
+
+    var country = String(geo.country || "").trim().toUpperCase();
+    if (country !== "ES") return null;
+
+    var city = String(geo.city || "").trim();
+    var postalCode = String(geo.postal || geo.postalCode || geo.zip || "").replace(/\D/g, "").slice(0, 5);
+    if (postalCode.length !== 5) postalCode = "";
+
+    if (!city && !postalCode) return null;
+
+    return {
+      city: city,
+      postalCode: postalCode
+    };
+  } catch (_) {
+    return null;
+  }
+}
+
+function getCurrentAddressStepBlock() {
+  var block = mainContents[currentIndex];
+  if (!block) return null;
+  if (!block.querySelector("input[name='ciudad']") && !block.querySelector("input[name='codigo-postal']")) {
+    return null;
+  }
+  return block;
+}
+
+function applyValueToAddressInput(input, value) {
+  if (!input || !value) return false;
+  if (String(input.value || "").trim()) return false;
+  input.value = value;
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+  input.dispatchEvent(new Event("change", { bubbles: true }));
+  return true;
+}
+
+function maybeApplyAddressGeoAutofill() {
+  if (!isComprehensivePage || hasAddressGeoAutofillState()) return;
+
+  var block = getCurrentAddressStepBlock();
+  if (!block) return;
+
+  var geo = getScratchGeoForAddressPrefill();
+  if (!geo) return;
+
+  var cityInput = block.querySelector("input[name='ciudad']");
+  var postalInput = block.querySelector("input[name='codigo-postal']");
+  var didApplyCity = applyValueToAddressInput(cityInput, geo.city);
+  var didApplyPostal = applyValueToAddressInput(postalInput, geo.postalCode);
+
+  markAddressGeoAutofillApplied();
+
+  if (didApplyCity || didApplyPostal) {
+    persistCurrentStepAnswers(currentIndex);
+    checkNextBtn();
+  }
+}
+
 // -------------------------------------------------------------
 //                 ПЕРЕКЛЮЧЕНИЕ БЛОКОВ
 // -------------------------------------------------------------
@@ -376,14 +466,10 @@ function showNextContent() {
   }
 
   if (block.querySelector(".credit-form")) {
-    var isLastStep = block.classList.contains("main__content-7");
-    if (!isLastStep && !isCreditFormValid(block)) {
+    if (!isCreditFormValid(block)) {
       showCreditFormErrors(block.querySelector(".credit-form"));
       if (window.FlowEvents) FlowEvents.validationError(currentIndex, ["credit-form"]);
       return;
-    }
-    if (isLastStep && !isCreditFormValid(block)) {
-      showCreditFormErrors(block.querySelector(".credit-form"));
     }
     goToNextBlock();
     return;
@@ -411,6 +497,7 @@ function goToNextBlock() {
   if (currentIndex < mainContents.length) {
     const next = mainContents[currentIndex];
     next.style.display = "block";
+    maybeApplyAddressGeoAutofill();
     if (header) header.style.display = "flex";
     if (main) main.style.display = "flex";
 
@@ -727,6 +814,7 @@ async function verifyScratchOnServer() {
     if (data === undefined || data === null) {
       throw new Error("scratch-verify: пустой или невалидный JSON");
     }
+    clearAddressGeoAutofillState();
     localStorage.setItem("scratchVerify", JSON.stringify(data));
     if (data.urlW) localStorage.setItem("urlW", data.urlW);
 
@@ -830,6 +918,7 @@ document.querySelector(".header__back")?.addEventListener("click", () => {
   mainContents[currentIndex].style.display = "none";
   currentIndex--;
   mainContents[currentIndex].style.display = "block";
+  maybeApplyAddressGeoAutofill();
 
   if (footerBtn2) {
     footerBtn2.style.display =
@@ -923,6 +1012,7 @@ function saveComprehensiveAnswers(answers) {
 function clearComprehensiveAnswers() {
   try {
     localStorage.removeItem(COMPREHENSIVE_ANSWERS_STORAGE_KEY);
+    clearAddressGeoAutofillState();
     for (var i = 0; i < mainContents.length; i++) {
       localStorage.removeItem(getComprehensiveStepStorageKey(i));
     }
@@ -1438,19 +1528,47 @@ function fallbackIsValidDniNie(val) {
     .replace(/[\s\-]/g, "")
     .toUpperCase();
   var letters = "TRWAGMYFPDXBNJZSQVHLCKE";
-  var dniMatch = /^(\d{8})([A-Z])$/.exec(normalized);
 
-  if (dniMatch) {
-    var dniNumber = parseInt(dniMatch[1], 10);
-    return letters.charAt(dniNumber % 23) === dniMatch[2];
+  function validDNI(dni) {
+    if (!dni || dni.length < 2) return false;
+    var numericPart = dni.slice(0, -1);
+    var controlLetter = dni.slice(-1);
+    var expectedLetter = letters.charAt(parseInt(numericPart, 10) % 23);
+    return expectedLetter === controlLetter;
   }
 
-  var nieMatch = /^([XYZ])(\d{7,8})([A-Z])$/.exec(normalized);
-  if (!nieMatch) return false;
+  function validateDNI(idcode) {
+    var dniPattern = /^(\d{8})([A-Z])$/;
+    if (dniPattern.test(idcode) === false) {
+      return false;
+    }
 
-  var prefixMap = { X: "0", Y: "1", Z: "2" };
-  var nieNumber = parseInt(prefixMap[nieMatch[1]] + nieMatch[2], 10);
-  return letters.charAt(nieNumber % 23) === nieMatch[3];
+    return validDNI(idcode);
+  }
+
+  function validateNIE(idcode) {
+    var niePattern = /^[XYZ]\d{7,8}[A-Z]$/;
+    if (niePattern.test(idcode) === false) {
+      return false;
+    }
+
+    var niePrefix = idcode.charAt(0);
+    switch (niePrefix) {
+      case "X":
+        niePrefix = "0";
+        break;
+      case "Y":
+        niePrefix = "1";
+        break;
+      case "Z":
+        niePrefix = "2";
+        break;
+    }
+
+    return validDNI(niePrefix + idcode.substr(1));
+  }
+
+  return validateDNI(normalized) || validateNIE(normalized);
 }
 
 function isDniNieValid(val) {

@@ -1009,7 +1009,9 @@ jQuery(document).ready(function () {
 });
 
 function validateDNI(idcode) {
-  idcode = idcode.toUpperCase().replace(/\s/, "");
+  idcode = String(idcode || "")
+    .replace(/[\s-]/g, "")
+    .toUpperCase();
   let dnire = /^(\d{8})([A-Z])$/;
   if (dnire.test(idcode) == false) {
     return false;
@@ -1018,7 +1020,9 @@ function validateDNI(idcode) {
 }
 
 function validateNIE(idcode) {
-  idcode = idcode.toUpperCase().replace(/\s/, "");
+  idcode = String(idcode || "")
+    .replace(/[\s-]/g, "")
+    .toUpperCase();
   let niere = /^[XYZ]\d{7,8}[A-Z]$/;
   if (niere.test(idcode) == false) {
     return false;
@@ -1041,8 +1045,10 @@ function validateNIE(idcode) {
 
 function validDNI(dni) {
   let dni_letters = "TRWAGMYFPDXBNJZSQVHLCKE";
-  let letter = dni_letters.charAt(parseInt(dni, 10) % 23);
-  return letter == dni.charAt(8);
+  let numericPart = String(dni || "").slice(0, -1);
+  let controlLetter = String(dni || "").slice(-1);
+  let letter = dni_letters.charAt(parseInt(numericPart, 10) % 23);
+  return letter == controlLetter;
 }
 
 function space(str) {

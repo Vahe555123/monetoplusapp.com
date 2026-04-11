@@ -111,6 +111,15 @@
       <button class="footer__btn" id="continueBtn">Continuar</button>
     </div>
 
+    <div class="waiting-modal" id="waitingModal" aria-hidden="true">
+      <div class="waiting-modal__backdrop" data-waiting-modal-close></div>
+      <div class="waiting-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="waitingModalTitle">
+        <h2 class="waiting-modal__title" id="waitingModalTitle">Procesando tu solicitud</h2>
+        <p class="waiting-modal__text">Por favor, espera 5-7 minutos y vuelve a intentarlo.</p>
+        <button type="button" class="waiting-modal__btn" data-waiting-modal-close>Entendido</button>
+      </div>
+    </div>
+
     <script>
       (function () {
         var span = document.querySelector(".user__text-desc");
@@ -163,24 +172,37 @@
         var continueBtn = document.getElementById("continueBtn");
         if (continueBtn) {
           var jobId = localStorage.getItem("lastJobId") || "";
-          // Mientras el bot procesa (~3 min), el botón abre WhatsApp con el Session ID
-          var waBase =
-            typeof window.buildWhatsAppUrl === "function"
-              ? window.buildWhatsAppUrl("Hola, ya hay resultado de mi solicitud?")
-              : (window.WHATSAPP_BASE_URL || "") +
-                encodeURIComponent("Hola, ya hay resultado de mi solicitud?");
+          // Mientras el bot procesa, mostramos aviso de espera sin salir de final.html.
           var resultadosUrl = null;
           var pollTimer = null;
+          var waitingModal = document.getElementById("waitingModal");
 
-          function setButtonToWhatsApp() {
+          function openWaitingModal() {
+            if (!waitingModal) return;
+            waitingModal.classList.add("waiting-modal--open");
+            waitingModal.setAttribute("aria-hidden", "false");
+          }
+
+          function closeWaitingModal() {
+            if (!waitingModal) return;
+            waitingModal.classList.remove("waiting-modal--open");
+            waitingModal.setAttribute("aria-hidden", "true");
+          }
+
+          document.querySelectorAll("[data-waiting-modal-close]").forEach(function (el) {
+            el.addEventListener("click", closeWaitingModal);
+          });
+
+          function setButtonToWaiting() {
             continueBtn.textContent = "Continuar";
             continueBtn.onclick = function () {
-              window.location.href = waBase;
+              openWaitingModal();
             };
           }
 
           function setButtonToResultados(url) {
             if (pollTimer) clearInterval(pollTimer);
+            closeWaitingModal();
             resultadosUrl = url;
             continueBtn.textContent = "Ver resultados";
             continueBtn.onclick = function () {
@@ -207,7 +229,7 @@
           }
 
           if (jobId) {
-            setButtonToWhatsApp();
+            setButtonToWaiting();
             pollJobStatus();
             pollTimer = setInterval(pollJobStatus, 5000);
           } else {

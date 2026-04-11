@@ -41,6 +41,7 @@
       d.status = false;
       d.url = "comprehensive.html";
       delete d.accessToken;
+      localStorage.removeItem("comprehensiveAddressGeoAutofillApplied");
       localStorage.setItem("scratchVerify", JSON.stringify(d));
     } catch (e) {}
   }
@@ -84,6 +85,7 @@
               d.ui = data.ui;
               d.status = data.status === false ? false : d.status;
               d.url = data.url || d.url || "comprehensive.html";
+              localStorage.removeItem("comprehensiveAddressGeoAutofillApplied");
               localStorage.setItem("scratchVerify", JSON.stringify(d));
             } catch (e) {}
           }

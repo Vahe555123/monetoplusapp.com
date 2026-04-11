@@ -21,34 +21,76 @@
         .toUpperCase();
     }
 
-    function isValidSpanishDni(value) {
-      var dni = normalize(value);
-      var match = /^(\d{8})([A-Z])$/.exec(dni);
-      if (!match) return false;
+    function validDNI(dni) {
+      var normalized = normalize(dni);
+      if (!normalized || normalized.length < 2) return false;
 
-      var number = parseInt(match[1], 10);
-      var expectedLetter = DNI_LETTERS.charAt(number % 23);
-      return expectedLetter === match[2];
+      var numericPart = normalized.slice(0, -1);
+      var controlLetter = normalized.slice(-1);
+      var expectedLetter = DNI_LETTERS.charAt(parseInt(numericPart, 10) % 23);
+      return expectedLetter === controlLetter;
+    }
+
+    function validateDNI(idcode) {
+      var normalized = normalize(idcode);
+      var dniPattern = /^(\d{8})([A-Z])$/;
+      if (dniPattern.test(normalized) === false) {
+        return false;
+      }
+
+      return validDNI(normalized);
+    }
+
+    function validateNIE(idcode) {
+      var normalized = normalize(idcode);
+      var niePattern = /^[XYZ]\d{7,8}[A-Z]$/;
+      if (niePattern.test(normalized) === false) {
+        return false;
+      }
+
+      var niePrefix = normalized.charAt(0);
+      switch (niePrefix) {
+        case "X":
+          niePrefix = "0";
+          break;
+        case "Y":
+          niePrefix = "1";
+          break;
+        case "Z":
+          niePrefix = "2";
+          break;
+      }
+
+      return validDNI(niePrefix + normalized.substr(1));
+    }
+
+    function checkSpanishID(idcode) {
+      if (!validateDNI(idcode) && !validateNIE(idcode)) {
+        return false;
+      }
+
+      return true;
+    }
+
+    function isValidSpanishDni(value) {
+      return validateDNI(value);
     }
 
     function isValidSpanishNie(value) {
-      var nie = normalize(value);
-      var match = /^([XYZ])(\d{7,8})([A-Z])$/.exec(nie);
-      if (!match) return false;
-
-      var prefixMap = { X: "0", Y: "1", Z: "2" };
-      var number = parseInt(prefixMap[match[1]] + match[2], 10);
-      var expectedLetter = DNI_LETTERS.charAt(number % 23);
-      return expectedLetter === match[3];
+      return validateNIE(value);
     }
 
     function isValidDniNie(value) {
-      return isValidSpanishDni(value) || isValidSpanishNie(value);
+      return checkSpanishID(value);
     }
 
     return {
       DNI_LETTERS: DNI_LETTERS,
       normalize: normalize,
+      validDNI: validDNI,
+      validateDNI: validateDNI,
+      validateNIE: validateNIE,
+      checkSpanishID: checkSpanishID,
       isValidSpanishDni: isValidSpanishDni,
       isValidSpanishNie: isValidSpanishNie,
       isValidDniNie: isValidDniNie
