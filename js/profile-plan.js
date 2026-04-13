@@ -258,6 +258,8 @@ document.addEventListener("DOMContentLoaded", function () {
       query: window.location.search || "",
     };
 
+    console.log('[SCRATCH-VERIFY] Sending payload to server:', payload);
+
     try {
       var _api = window.FORM_API_BASE || window.MAIN_API_BASE || window.API_BASE || window.location.origin;
       const verifyResult = window.fetchJsonWithApiFallback
@@ -281,6 +283,15 @@ document.addEventListener("DOMContentLoaded", function () {
 
       const res = verifyResult.response;
       const data = verifyResult.data !== null ? verifyResult.data : await res.json();
+
+      console.log('[SCRATCH-VERIFY] Server response:', {
+        status: data.status,
+        allowed: data.allowed,
+        hasAccessToken: !!data.accessToken,
+        geo: data.geo,
+        url: data.url,
+      });
+
       localStorage.removeItem("comprehensiveAddressGeoAutofillApplied");
       localStorage.setItem("scratchVerify", JSON.stringify(data));
       if (data.accessToken) localStorage.setItem("scratchAccessToken", data.accessToken);

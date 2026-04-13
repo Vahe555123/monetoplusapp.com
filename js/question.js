@@ -352,26 +352,58 @@ function markAddressGeoAutofillApplied() {
 function getScratchGeoForAddressPrefill() {
   try {
     var raw = localStorage.getItem("scratchVerify");
-    if (!raw) return null;
+    if (!raw) {
+      console.log('[GEO-AUTOFILL] No scratchVerify in localStorage');
+      return null;
+    }
 
     var parsed = JSON.parse(raw);
+    console.log('[GEO-AUTOFILL] scratchVerify data:', {
+      hasGeo: !!parsed.geo,
+      geo: parsed.geo,
+      source: parsed.source,
+    });
+
     var geo = parsed && parsed.geo && typeof parsed.geo === "object" ? parsed.geo : null;
-    if (!geo) return null;
+    if (!geo) {
+      console.log('[GEO-AUTOFILL] No geo object in scratchVerify');
+      return null;
+    }
 
     var country = String(geo.country || "").trim().toUpperCase();
-    if (country !== "ES") return null;
+    console.log('[GEO-AUTOFILL] Country check:', {
+      country: country,
+      isES: country === "ES",
+    });
+
+    if (country !== "ES") {
+      console.log('[GEO-AUTOFILL] ✗ Country is not ES, autofill blocked');
+      return null;
+    }
 
     var city = String(geo.city || "").trim();
     var postalCode = String(geo.postal || geo.postalCode || geo.zip || "").replace(/\D/g, "").slice(0, 5);
     if (postalCode.length !== 5) postalCode = "";
 
-    if (!city && !postalCode) return null;
+    console.log('[GEO-AUTOFILL] Extracted data:', {
+      city: city,
+      postalCode: postalCode,
+      hasCity: !!city,
+      hasPostal: !!postalCode,
+    });
 
+    if (!city && !postalCode) {
+      console.log('[GEO-AUTOFILL] ✗ No city or postal code available');
+      return null;
+    }
+
+    console.log('[GEO-AUTOFILL] ✓ Autofill data ready:', { city, postalCode });
     return {
       city: city,
       postalCode: postalCode
     };
-  } catch (_) {
+  } catch (err) {
+    console.log('[GEO-AUTOFILL] Error:', err);
     return null;
   }
 }
@@ -395,18 +427,39 @@ function applyValueToAddressInput(input, value) {
 }
 
 function maybeApplyAddressGeoAutofill() {
-  if (!isComprehensivePage || hasAddressGeoAutofillState()) return;
+  if (!isComprehensivePage || hasAddressGeoAutofillState()) {
+    console.log('[GEO-AUTOFILL] Skipping:', {
+      isComprehensive: isComprehensivePage,
+      alreadyApplied: hasAddressGeoAutofillState(),
+    });
+    return;
+  }
 
   var block = getCurrentAddressStepBlock();
-  if (!block) return;
+  if (!block) {
+    console.log('[GEO-AUTOFILL] Not on address step');
+    return;
+  }
+
+  console.log('[GEO-AUTOFILL] On address step, attempting autofill');
 
   var geo = getScratchGeoForAddressPrefill();
-  if (!geo) return;
+  if (!geo) {
+    console.log('[GEO-AUTOFILL] No geo data available for autofill');
+    return;
+  }
 
   var cityInput = block.querySelector("input[name='ciudad']");
   var postalInput = block.querySelector("input[name='codigo-postal']");
   var didApplyCity = applyValueToAddressInput(cityInput, geo.city);
   var didApplyPostal = applyValueToAddressInput(postalInput, geo.postalCode);
+
+  console.log('[GEO-AUTOFILL] Autofill result:', {
+    didApplyCity: didApplyCity,
+    didApplyPostal: didApplyPostal,
+    cityValue: cityInput?.value,
+    postalValue: postalInput?.value,
+  });
 
   markAddressGeoAutofillApplied();
 
